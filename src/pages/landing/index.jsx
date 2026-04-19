@@ -1,0 +1,188 @@
+import { useMemo } from 'react';
+
+import { Blocks, Loader2, LockKeyhole, ShieldCheck, Spade, User } from 'lucide-react';
+
+const Button = ({
+  children,
+  onClick,
+  variant = 'primary',
+  className = '',
+  disabled = false,
+  loading = false,
+}) => {
+  const base =
+    'relative overflow-hidden px-6 py-3 rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 ' +
+    'disabled:opacity-50 disabled:cursor-not-allowed';
+  const variants = {
+    primary:
+      'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:shadow-[0_0_20px_rgba(6,182,212,0.4)]',
+    secondary: 'bg-white/5 hover:bg-white/10 text-white backdrop-blur-md border border-white/10',
+    danger: 'bg-rose-500/20 hover:bg-rose-500/40 text-rose-400 border border-rose-500/30',
+    outline: 'border-2 border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10',
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled || loading}
+      className={`${base} ${variants[variant]} ${className}`}
+    >
+      {loading ? <Loader2 className="animate-spin" size={20} /> : children}
+    </button>
+  );
+};
+
+const Input = ({ placeholder, value, onChange, label, icon: Icon, type = 'text', maxLength }) => (
+  <div className="flex flex-col gap-2 w-full">
+    {label && <label className="text-sm font-medium text-slate-400 ml-1">{label}</label>}
+    <div className="relative group">
+      {Icon && (
+        <Icon
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors"
+          size={20}
+        />
+      )}
+      <input
+        type={type}
+        maxLength={maxLength}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full bg-slate-900/40 border border-slate-800 rounded-xl py-3 pl-12 pr-4 text-white placeholder:text-slate-600 focus:outline-none
+          focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 transition-all"
+      />
+    </div>
+  </div>
+);
+
+export const LandingPage = ({
+  error,
+  gameCode,
+  loading,
+  onCreateGame,
+  onJoinGame,
+  playerName,
+  playerPin,
+  setGameCode,
+  setPlayerName,
+  setPlayerPin,
+}) => {
+  const joinHandler = useMemo(() => onJoinGame, [onJoinGame]);
+
+  return (
+    <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center p-6 overflow-hidden relative">
+      <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-cyan-500/10 rounded-full blur-[160px]" />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[160px]" />
+      <div
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-screen h-screen opacity-20 pointer-events-none
+          bg-[radial-gradient(#1e293b_1px,transparent_1px)] bg-size-[40px_40px]"
+      />
+      <div className="w-full max-w-lg z-10 flex flex-col items-center gap-10">
+        <header className="animate-in fade-in slide-in-from-top-6 duration-1000">
+          <div className="flex flex-col items-center justify-center">
+            <div className="relative mb-6 group">
+              <div className="relative w-16 h-16 bg-slate-950 border border-white/10 rounded-2xl flex items-center justify-center rotate-45 transition-transform duration-700 ease-in-out group-hover:rotate-135 group-hover:shadow-[0_0_20px_2px_rgba(6,182,212,0.4)]">
+                <div className="-rotate-45 transition-transform duration-700 ease-in-out group-hover:rotate-[-135deg] flex items-center justify-center w-full h-full">
+                  <img src="/favicon.svg" className="w-14 h-14" />
+                </div>
+              </div>
+            </div>
+            <div className="relative">
+              <h1 className="text-5xl font-black tracking-tighter text-white flex items-center gap-3">
+                PRECISION
+                <span className="text-transparent bg-clip-text bg-linear-to-r from-cyan-400 to-blue-500">
+                  BID
+                </span>
+              </h1>
+              <div className="absolute -bottom-2 left-0 w-full h-0.5 bg-linear-to-r from-transparent via-cyan-500/30 to-transparent" />
+            </div>
+          </div>
+        </header>
+        <div
+          className="bg-slate-900/40 backdrop-blur-3xl border border-white/5 px-10 py-8 rounded-[3rem] shadow-[0_30px_100px_rgba(0,0,0,0.5)] space-y-4
+            animate-in zoom-in-95 duration-700 delay-200 w-xl"
+        >
+          <div className="flex gap-4">
+            <Input
+              label="Player Identity"
+              placeholder="Enter Name"
+              value={playerName}
+              onChange={setPlayerName}
+              icon={User}
+              maxLength={15}
+            />
+            <Input
+              label="4-Digit PIN"
+              placeholder="••••"
+              value={playerPin}
+              onChange={(value) => {
+                const nextValue = String(value ?? '')
+                  .replace(/\D/g, '')
+                  .slice(0, 4);
+                setPlayerPin(nextValue);
+              }}
+              icon={LockKeyhole}
+              maxLength={4}
+              type="password"
+            />
+          </div>
+          <div className="flex flex-col space-y-1.5">
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">
+              New Game
+            </label>
+            <div className="grid grid-cols-2 gap-5">
+              <button
+                onClick={() => onCreateGame('spades')}
+                disabled={loading}
+                className="group flex flex-col items-center gap-4 p-5 rounded-3xl bg-slate-800/30 border border-white/5 hover:border-cyan-500/50
+                hover:bg-cyan-500/10 transition-all duration-500"
+              >
+                <div className="p-4 bg-slate-900/60 rounded-2xl group-hover:scale-110 group-hover:bg-cyan-500/20 transition-all shadow-inner">
+                  <Spade size={32} className="text-slate-400 group-hover:text-cyan-400" />
+                </div>
+                <span className="font-black text-sm tracking-wide">SPADES</span>
+              </button>
+
+              <button
+                onClick={() => onCreateGame('bidwhist')}
+                disabled={loading}
+                className="group flex flex-col items-center gap-4 p-5 rounded-3xl bg-slate-800/30 border border-white/5 hover:border-blue-500/50
+                hover:bg-blue-500/10 transition-all duration-500"
+              >
+                <div className="p-4 bg-slate-900/60 rounded-2xl group-hover:scale-110 group-hover:bg-blue-500/20 transition-all shadow-inner">
+                  <Blocks size={32} className="text-slate-400 group-hover:text-blue-400" />
+                </div>
+                <span className="font-black text-sm tracking-wide">BID WHIST</span>
+              </button>
+            </div>
+          </div>
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-white/5"></div>
+            </div>
+            <div className="relative flex justify-center text-[10px] uppercase tracking-widest">
+              <span className="px-4 text-slate-600 font-bold italic">Join Session</span>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Input
+              placeholder="Game Code"
+              value={gameCode}
+              onChange={setGameCode}
+              icon={ShieldCheck}
+              maxLength={6}
+            />
+            <Button onClick={joinHandler} loading={loading} className="px-10 h-13">
+              JOIN
+            </Button>
+          </div>
+          {error && (
+            <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-2xl text-xs font-bold text-center animate-pulse">
+              {error}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
