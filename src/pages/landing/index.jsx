@@ -56,7 +56,6 @@ const Input = ({ placeholder, value, onChange, label, icon: Icon, type = 'text',
 );
 
 export const LandingPage = ({
-  error,
   gameCode,
   loading,
   onCreateGame,
@@ -83,7 +82,7 @@ export const LandingPage = ({
             <div className="relative mb-6 group">
               <div className="relative w-16 h-16 bg-slate-950 border border-white/10 rounded-2xl flex items-center justify-center rotate-45 transition-transform duration-700 ease-in-out group-hover:rotate-135 group-hover:shadow-[0_0_20px_2px_rgba(6,182,212,0.4)]">
                 <div className="-rotate-45 transition-transform duration-700 ease-in-out group-hover:rotate-[-135deg] flex items-center justify-center w-full h-full">
-                  <img src="/favicon.svg" className="w-14 h-14" />
+                  <img src="/logo.svg" className="w-14 h-14" />
                 </div>
               </div>
             </div>
@@ -161,7 +160,7 @@ export const LandingPage = ({
               <div className="w-full border-t border-white/5"></div>
             </div>
             <div className="relative flex justify-center text-[10px] uppercase tracking-widest">
-              <span className="px-4 text-slate-600 font-bold italic">Join Session</span>
+              <span className="px-4 text-slate-600 font-bold">Join Session</span>
             </div>
           </div>
           <div className="flex gap-3">
@@ -176,11 +175,6 @@ export const LandingPage = ({
               JOIN
             </Button>
           </div>
-          {error && (
-            <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-2xl text-xs font-bold text-center animate-pulse">
-              {error}
-            </div>
-          )}
         </div>
       </div>
     </div>

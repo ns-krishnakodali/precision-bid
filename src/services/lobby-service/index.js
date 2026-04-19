@@ -46,6 +46,7 @@ const createGameSession = async ({ playerId, playerName, playerPin, type }) => {
         isHost: true,
         name: playerName,
         pin: playerPin,
+        joinedAt: Date.now(),
       },
     },
     status: 'lobby',
@@ -80,6 +81,7 @@ const joinGameSession = async ({ gameCode, playerId, playerName, playerPin }) =>
         isHost: false,
         name: playerName,
         pin: playerPin,
+        joinedAt: Date.now(),
       },
     });
   }

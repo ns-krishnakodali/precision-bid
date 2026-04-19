@@ -29,10 +29,10 @@ const App = () => {
         }
 
         const playersObject = data.players ?? {};
-        const players = Object.values(playersObject).sort((a, b) => {
-          const hostDiff = Number(Boolean(b.isHost)) - Number(Boolean(a.isHost));
-          if (hostDiff !== 0) return hostDiff;
-          return String(a.name ?? '').localeCompare(String(b.name ?? ''));
+        const players = Object.values(playersObject).sort((p1, p2) => {
+          if (p1.host && !p2.host) return -1;
+          if (!p1.host && p2.host) return 1;
+          return p1.joinedAt - p2.joinedAt;
         });
 
         setGameData({ ...data, id: data.gameCode, players });

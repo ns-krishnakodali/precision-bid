@@ -3,6 +3,17 @@ export const GAME_TYPE = {
   SPADES: 'Spades',
 };
 
+export const SPADES_VARIANT = {
+  CLASSIC: 'Classic',
+  OH_HELL: 'Oh Hell',
+};
+
+export const BID_WHIST_VARIANT = {
+  UPTOWN: 'Uptown (Oh Hell)',
+  DOWNTOWN: 'Downtown (Oh Hell)',
+  NO_TRUMP: ' No Trump (Classic)',
+};
+
 export const GAME_STATE = {
   LANDING: 'LANDING',
   LOBBY: 'LOBBY',

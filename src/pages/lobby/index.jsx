@@ -1,4 +1,18 @@
-import { ChevronRight, Club, Copy, Crown, LogOut, Loader2, ShieldCheck, Spade, Users } from 'lucide-react';
+import {
+  Check,
+  ChevronRight,
+  Copy,
+  LogOut,
+  Loader2,
+  ShieldCheck,
+  Spade,
+  Users,
+  User,
+  ShieldUser,
+  Blocks,
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { BID_WHIST_VARIANT, SPADES_VARIANT } from '../../constants';
 
 const Button = ({
   children,
@@ -9,7 +23,8 @@ const Button = ({
   loading = false,
 }) => {
   const base =
-    'relative overflow-hidden px-6 py-3 rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed';
+    'relative overflow-hidden px-6 py-3 rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 ' +
+    'disabled:cursor-not-allowed';
   const variants = {
     primary:
       'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:shadow-[0_0_20px_rgba(6,182,212,0.4)]',
@@ -29,32 +44,66 @@ const Button = ({
   );
 };
 
-export const LobbyPage = ({
-  error,
-  gameData,
-  onLeave,
-  onStartGame,
-  onUpdateVariant,
-  user,
-}) => {
+export const LobbyPage = ({ gameData, onLeave, onStartGame, onUpdateVariant, user }) => {
+  const [isCodeCopied, setIsCodeCopied] = useState(false);
+  const codeCopiedTimeoutRef = useRef(null);
+
   const isHost = gameData?.hostId === user?.uid;
   const variants =
-    gameData?.type === 'spades' ? ['classic', 'oh hell'] : ['uptown', 'downtown', 'no trump'];
+    gameData?.type === 'spades' ? Object.values(SPADES_VARIANT) : Object.values(BID_WHIST_VARIANT);
 
-  const copyCode = () => {
-    if (gameData?.id) {
+  useEffect(() => {
+    return () => {
+      if (codeCopiedTimeoutRef.current) {
+        clearTimeout(codeCopiedTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const showCodeCopied = () => {
+    setIsCodeCopied(true);
+
+    if (codeCopiedTimeoutRef.current) {
+      clearTimeout(codeCopiedTimeoutRef.current);
+    }
+
+    codeCopiedTimeoutRef.current = setTimeout(() => {
+      setIsCodeCopied(false);
+      codeCopiedTimeoutRef.current = null;
+    }, 900);
+  };
+
+  const copyCode = async () => {
+    if (!gameData?.id) return;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(gameData.id);
+        showCodeCopied();
+        return;
+      }
+
       const dummy = document.createElement('textarea');
       document.body.appendChild(dummy);
       dummy.value = gameData.id;
       dummy.select();
-      document.execCommand('copy');
+      const didCopy = document.execCommand('copy');
       document.body.removeChild(dummy);
+
+      if (didCopy) {
+        showCodeCopied();
+        return;
+      }
+
+      console.error('Failed to copy game code');
+    } catch (err) {
+      console.error('Failed to copy game code', err);
     }
   };
 
   return (
     <div className="min-h-screen bg-[#020617] text-white p-6 md:p-12 flex items-center justify-center relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-50" />
+      <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-cyan-500 to-transparent opacity-50" />
 
       <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-12 gap-8 items-start relative z-10">
         <div className="md:col-span-7 space-y-6">
@@ -70,66 +119,90 @@ export const LobbyPage = ({
             </div>
             <div
               onClick={copyCode}
-              className="flex items-center gap-4 bg-slate-900/60 border border-white/5 px-5 py-3 rounded-2xl cursor-pointer hover:border-cyan-500/40 transition-all group shadow-xl"
+              className="flex items-center gap-4 bg-slate-900/60 border border-white/5 px-5 py-3 rounded-2xl cursor-pointer hover:border-cyan-500/40
+                transition-all group shadow-xl"
             >
-              <div className="flex flex-col text-right">
+              <div className="flex flex-col gap-1 text-left">
                 <span className="text-[10px] text-slate-600 uppercase font-black tracking-tighter">
-                  Access Key
+                  Game Code
                 </span>
                 <span className="text-2xl font-mono font-black text-cyan-500 leading-none">
                   {gameData.id}
                 </span>
               </div>
-              <div className="p-2 bg-slate-800 rounded-lg group-hover:bg-cyan-500/20 group-active:scale-90 transition-all">
-                <Copy size={20} className="text-slate-400 group-hover:text-cyan-400" />
+              <div
+                className={`rounded-lg group-active:scale-90 transition-all relative w-10 h-10 flex items-center justify-center ${
+                  isCodeCopied
+                    ? 'bg-emerald-500/10 border border-emerald-500/20'
+                    : 'bg-slate-800 group-hover:bg-cyan-500/20'
+                }`}
+              >
+                <Check
+                  size={20}
+                  className={`absolute text-emerald-400 transition-all duration-200 ${
+                    isCodeCopied ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
+                  }`}
+                />
+                <Copy
+                  size={20}
+                  className={`absolute text-slate-400 group-hover:text-cyan-400 transition-all duration-200 ${
+                    isCodeCopied ? 'opacity-0 scale-75' : 'opacity-100 scale-100'
+                  }`}
+                />
               </div>
             </div>
           </div>
 
           <div className="grid gap-4">
-            {gameData.players.map((p, idx) => (
+            {gameData.players.map((player, idx) => (
               <div
-                key={p.id}
-                className={`group flex items-center gap-5 p-5 rounded-[2rem] bg-slate-900/40 border border-white/5 backdrop-blur-xl animate-in slide-in-from-bottom-4 duration-500 delay-${idx * 100}`}
+                key={player.id}
+                className={`group flex items-center gap-5 p-5 rounded-4xl bg-slate-900/40 border border-white/5 backdrop-blur-xl animate-in slide-in-from-bottom-4
+                  duration-500 delay-${idx * 100}`}
               >
                 <div
-                  className={`w-14 h-14 rounded-2xl flex-shrink-0 flex items-center justify-center font-black text-xl shadow-lg transition-transform group-hover:rotate-3 ${p.isHost ? 'bg-gradient-to-br from-cyan-400 to-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+                  className={`w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center font-black text-xl shadow-lg transition-transform group-hover:rotate-3
+                    ${player.isHost ? 'bg-linear-to-br from-cyan-400 to-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}
                 >
-                  {p.isHost ? <Crown size={28} /> : p.name.toUpperCase()}
+                  {player.isHost ? <ShieldUser size={32} /> : <User size={28} />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-lg font-black flex items-center gap-2 flex-wrap">
-                    <span className="truncate">{p.name}</span>
-                    {p.id === user.uid && (
-                      <span className="flex-shrink-0 text-[9px] bg-cyan-500/20 border border-cyan-500/30 px-2 py-0.5 rounded-full text-cyan-400 uppercase font-black tracking-tighter">
+                    <span className="truncate">{player.name}</span>
+                    {player.id === user.uid && (
+                      <span
+                        className="shrink-0 text-[9px] bg-cyan-500/20 border border-cyan-500/30 px-2 py-0.5 rounded-full text-cyan-400 uppercase font-black
+                          tracking-tighter"
+                      >
                         YOU
                       </span>
                     )}
                   </div>
                   <div className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em]">
-                    {p.isHost ? 'Host' : 'Player'}
+                    {player.isHost ? 'Host' : 'Player'}
                   </div>
                 </div>
-                <div className="px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-500 font-black whitespace-nowrap hidden sm:block">
+                <div
+                  className="px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-500 font-black whitespace-nowrap
+                    hidden sm:block"
+                >
                   CONNECTED
                 </div>
               </div>
             ))}
-
             <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden mt-2">
               <div
-                className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-1000"
+                className="h-full bg-linear-to-r from-cyan-500 to-blue-500 transition-all duration-1000"
                 style={{ width: `${(gameData.players.length / gameData.maxPlayers) * 100}%` }}
               />
             </div>
           </div>
         </div>
-
         <div className="md:col-span-5 space-y-6">
           <div className="bg-slate-900/40 border border-white/5 p-8 rounded-[2.5rem] backdrop-blur-3xl shadow-2xl relative overflow-hidden">
             <div className="space-y-6 relative z-10">
               <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-2">
-                <div className="w-4 h-[2px] bg-cyan-500" /> Game Settings
+                <div className="w-4 h-0.5 bg-cyan-500" /> Game Settings
               </h3>
 
               <div className="space-y-3">
@@ -141,7 +214,7 @@ export const LobbyPage = ({
                     {gameData.type === 'spades' ? (
                       <Spade className="text-cyan-400" />
                     ) : (
-                      <Club className="text-blue-400" />
+                      <Blocks className="text-blue-400" />
                     )}
                   </div>
                   <div>
@@ -156,25 +229,24 @@ export const LobbyPage = ({
                   </div>
                 </div>
               </div>
-
               <div className="space-y-3">
                 <p className="text-[10px] font-black text-cyan-500/80 uppercase tracking-widest ml-1">
                   Variant Rules
                 </p>
                 <div className="grid grid-cols-1 gap-2">
-                  {variants.map((v) => (
+                  {variants.map((variant) => (
                     <button
-                      key={v}
-                      onClick={() => onUpdateVariant(v)}
+                      key={variant}
+                      onClick={() => onUpdateVariant(variant)}
                       disabled={!isHost}
                       className={`group flex items-center justify-between p-4 rounded-2xl border transition-all duration-300 ${
-                        gameData.variant === v
+                        gameData.variant === variant
                           ? 'bg-cyan-500 text-white border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)]'
                           : 'bg-slate-950/50 border-white/5 text-slate-500 hover:border-white/20'
                       }`}
                     >
-                      <span className="capitalize font-black tracking-wide">{v}</span>
-                      {gameData.variant === v ? (
+                      <span className="capitalize font-black tracking-wide">{variant}</span>
+                      {gameData.variant === variant ? (
                         <div className="bg-white/20 p-1 rounded-md">
                           <ShieldCheck size={16} />
                         </div>
@@ -186,19 +258,18 @@ export const LobbyPage = ({
                 </div>
               </div>
             </div>
-
             <div className="mt-10 space-y-4">
               {isHost ? (
                 <Button
                   onClick={onStartGame}
-                  className="w-full h-16 text-xl tracking-[0.1em] font-black uppercase italic"
+                  className="w-full h-16 text-xl tracking-widest font-black uppercase italic"
                   disabled={gameData.players.length < gameData.minPlayers}
                 >
                   START GAME{' '}
                   <ChevronRight className="group-hover:translate-x-1 transition-transform" />
                 </Button>
               ) : (
-                <div className="flex flex-col items-center gap-4 text-center p-6 rounded-[2rem] bg-cyan-500/5 border border-cyan-500/10">
+                <div className="flex flex-col items-center gap-4 text-center p-6 rounded-4xl bg-cyan-500/5 border border-cyan-500/10">
                   <div className="flex gap-1">
                     <div className="w-2 h-2 rounded-full bg-cyan-500 animate-bounce [animation-delay:-0.3s]"></div>
                     <div className="w-2 h-2 rounded-full bg-cyan-500 animate-bounce [animation-delay:-0.15s]"></div>
@@ -209,24 +280,17 @@ export const LobbyPage = ({
                   </p>
                 </div>
               )}
-
               <button
                 onClick={onLeave}
-                className="w-full text-[10px] font-black text-slate-600 hover:text-rose-500 transition-colors uppercase tracking-[0.3em] flex items-center justify-center gap-2"
+                className="w-full text-xs font-black text-slate-600 hover:text-rose-500 transition-colors uppercase tracking-[0.3em] flex items-center
+                  justify-center gap-2"
               >
                 <LogOut size={12} /> Leave Session
               </button>
             </div>
-
-            {error && (
-              <p className="mt-4 text-rose-500 text-[10px] font-black text-center uppercase tracking-widest">
-                {error}
-              </p>
-            )}
           </div>
         </div>
       </div>
     </div>
   );
 };
-
