@@ -1,5 +1,9 @@
 @import 'tailwindcss';
 
+body {
+  background-color: #020617;
+}
+
 * {
   cursor:
     url('/cursor.svg') 2 2,

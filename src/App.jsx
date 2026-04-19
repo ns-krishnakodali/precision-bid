@@ -1,22 +1,35 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { GAME_STATE } from './constants';
+import { Loading, Toaster } from './components';
+import { GAME_CONFIG, GAME_STATE, LOBBY_STATUS } from './constants';
 import { ArenaPage, LobbyPage, LandingPage } from './pages';
-import { clientService, lobbyService } from './services';
+import { lobbyService } from './services';
 
 const App = () => {
-  const [user] = useState(() => ({ uid: clientService.getOrCreateClientId() }));
   const [view, setView] = useState(GAME_STATE.LANDING);
   const [gameData, setGameData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [playerName, setPlayerName] = useState('');
-  const [playerPin, setPlayerPin] = useState('');
-  const [gameCode, setGameCode] = useState('');
-  const [error, setError] = useState('');
   const [lobbyId, setLobbyId] = useState('');
+  const [toast, setToast] = useState(null);
+
+  const dismissToast = useCallback(() => {
+    setToast(null);
+  }, []);
+
+  const showToast = useCallback(({ message, type = 'info' }) => {
+    const trimmedMessage = String(message ?? '').trim();
+    if (!trimmedMessage) return;
+
+    setToast({
+      id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      message: trimmedMessage,
+      type,
+    });
+  }, []);
 
   useEffect(() => {
-    if (!user || !lobbyId) return undefined;
+    if (!lobbyId) return undefined;
 
     const unsubscribe = lobbyService.subscribeToLobby({
       lobbyId,
@@ -24,151 +37,137 @@ const App = () => {
         if (!data) {
           setView(GAME_STATE.LANDING);
           setGameData(null);
-          setError('Game session has ended.');
+          setLobbyId('');
+          showToast({ message: 'Game session has ended.', type: 'info' });
           return;
         }
 
         const playersObject = data.players ?? {};
         const players = Object.values(playersObject).sort((p1, p2) => {
-          if (p1.host && !p2.host) return -1;
-          if (!p1.host && p2.host) return 1;
+          if (p1.isHost && !p2.isHost) return -1;
+          if (!p1.isHost && p2.isHost) return 1;
           return p1.joinedAt - p2.joinedAt;
         });
 
         setGameData({ ...data, id: data.gameCode, players });
-        if (data.status === 'playing') setView(GAME_STATE.GAME);
+        if (data.status === LOBBY_STATUS.IN_GAME) setView(GAME_STATE.GAME);
       },
       onError: (dbErr) => {
         console.error('RTDB sync error:', dbErr);
-        setError('Database connection lost.');
+        showToast({ message: 'Database connection lost.', type: 'error' });
       },
     });
 
     return () => unsubscribe?.();
-  }, [lobbyId, user]);
+  }, [lobbyId, showToast]);
 
-  const handleCreateGame = useCallback(
-    async (type) => {
-      if (!user) return setError('Authenticating... please wait.');
-      if (!playerName.trim()) return setError('Please enter your name');
-      if (playerPin.length !== 4) return setError('Please enter your 4-digit pin');
-      setLoading(true);
-      setError('');
+  const handleCreateGame = async (gameType, pName, playerPin) => {
+    if (!String(pName ?? '').trim()) {
+      showToast({ message: 'Please enter your name', type: 'error' });
+      return;
+    }
+    if (String(playerPin ?? '').length !== 4) {
+      showToast({ message: 'Please enter your 4-digit pin', type: 'error' });
+      return;
+    }
 
-      try {
-        const { gameCode: createdGameCode, lobbyId: createdLobbyId } =
-          await lobbyService.createGameSession({
-            playerId: user.uid,
-            playerName,
-            playerPin,
-            type,
-          });
-
-        setGameCode(createdGameCode);
-        setLobbyId(createdLobbyId);
-        setView(GAME_STATE.LOBBY);
-      } catch (createErr) {
-        console.error('Create error:', createErr);
-        setError('Failed to create game. Permission error.');
-      } finally {
-        setLoading(false);
-      }
-    },
-    [playerName, playerPin, user]
-  );
-
-  const handleJoinGame = useCallback(async () => {
-    if (!user) return setError('Authenticating... please wait.');
-    if (!playerName.trim()) return setError('Please enter your name');
-    if (playerPin.length !== 4) return setError('Please enter your 4-digit pin');
-    if (!gameCode.trim()) return setError('Please enter a game code');
+    setPlayerName(pName);
     setLoading(true);
-    setError('');
 
     try {
-      const normalizedGameCode = gameCode.trim().toUpperCase();
-      const { error: joinError, lobbyId: foundLobbyId } = await lobbyService.joinGameSession({
-        gameCode: normalizedGameCode,
-        playerId: user.uid,
-        playerName,
-        playerPin,
-      });
+      const { gameCode: createdGameCode, lobbyId: newLobbyId } =
+        await lobbyService.createGameSession(pName, playerPin, gameType);
+
+      setLobbyId(newLobbyId);
+      setView(GAME_STATE.LOBBY);
+      showToast({ message: `Game created. Code: ${createdGameCode}`, type: 'success' });
+    } catch (createErr) {
+      console.error('Create error:', createErr);
+      showToast({ message: 'Failed to create game.', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleJoinGame = async (newGameCode, pName, playerPin) => {
+    if (!String(pName ?? '').trim()) {
+      showToast({ message: 'Please enter your name', type: 'error' });
+      return;
+    }
+    if (String(playerPin ?? '').length !== 4) {
+      showToast({ message: 'Please enter your 4-digit pin', type: 'error' });
+      return;
+    }
+    if (!String(newGameCode ?? '').trim()) {
+      showToast({ message: 'Please enter a game code', type: 'error' });
+      return;
+    }
+
+    setPlayerName(pName);
+    setLoading(true);
+
+    try {
+      const { error: joinError, lobbyId: foundLobbyId } = await lobbyService.joinGameSession(
+        newGameCode,
+        pName,
+        playerPin
+      );
 
       if (joinError) {
-        setError(joinError);
-        setLoading(false);
+        showToast({ message: joinError, type: 'error' });
         return;
       }
 
       setLobbyId(foundLobbyId);
       setView(GAME_STATE.LOBBY);
+      showToast({ message: 'Joined lobby.', type: 'success' });
     } catch (joinErr) {
       console.error('Join error:', joinErr);
-      setError('Failed to join game.');
+      showToast({ message: 'Failed to join game.', type: 'error' });
     } finally {
       setLoading(false);
     }
-  }, [gameCode, playerName, playerPin, user]);
+  };
 
-  const handleUpdateVariant = useCallback(
-    async (variant) => {
-      if (!user || gameData?.hostId !== user.uid) return;
-      try {
-        await lobbyService.updateVariant({ lobbyId, variant });
-      } catch {
-        setError('Failed to update settings.');
-      }
-    },
-    [gameData?.hostId, lobbyId, user]
-  );
-
-  const handleStartGame = useCallback(async () => {
-    if (!user) return;
-    if (gameData.players.length < gameData.minPlayers) {
-      setError(`Need at least ${gameData.minPlayers} players to start.`);
+  const handleStartGame = async (variant) => {
+    const minPlayers = GAME_CONFIG[gameData?.gameType]?.minPlayers;
+    if (gameData.players.length < minPlayers) {
+      showToast({
+        message: `Need at least ${minPlayers} players to start.`,
+        variant: 'error',
+      });
       return;
     }
     try {
-      await lobbyService.startGame({ lobbyId });
+      await lobbyService.startGame(lobbyId, variant);
     } catch {
-      setError('Failed to start game.');
+      showToast({ message: 'Failed to start game.', type: 'error' });
     }
-  }, [gameData, lobbyId, user]);
+  };
 
-  const handleLeave = useCallback(() => {
+  const handleLeave = () => {
     setView(GAME_STATE.LANDING);
     setGameData(null);
     setLobbyId('');
-    setError('');
-  }, []);
+    setToast(null);
+  };
+
+  if (loading) return <Loading />;
 
   return (
-    <div className="font-sans antialiased selection:bg-cyan-500 selection:text-white">
+    <div className="font-sans antialiased bg-[#020617] selection:bg-cyan-500 selection:text-white">
+      <Toaster toast={toast} onDismiss={dismissToast} />
       {view === GAME_STATE.LANDING && (
-        <LandingPage
-          error={error}
-          gameCode={gameCode}
-          loading={loading}
-          onCreateGame={handleCreateGame}
-          onJoinGame={handleJoinGame}
-          playerName={playerName}
-          playerPin={playerPin}
-          setGameCode={setGameCode}
-          setPlayerName={setPlayerName}
-          setPlayerPin={setPlayerPin}
-        />
+        <LandingPage onCreateGame={handleCreateGame} onJoinGame={handleJoinGame} />
       )}
-      {view === GAME_STATE.LOBBY && gameData && user && (
+      {view === GAME_STATE.LOBBY && gameData && (
         <LobbyPage
-          error={error}
           gameData={gameData}
+          playerName={playerName}
           onLeave={handleLeave}
           onStartGame={handleStartGame}
-          onUpdateVariant={handleUpdateVariant}
-          user={user}
         />
       )}
-
       {view === GAME_STATE.GAME && <ArenaPage onAbortToLobby={() => setView(GAME_STATE.LOBBY)} />}
     </div>
   );

@@ -1,29 +1,26 @@
 import { get, onValue, push, ref, serverTimestamp, set, update } from 'firebase/database';
 
+import { GAME_CONFIG, LOBBY_STATUS, MAX_ATTEMPTS } from '../../constants';
 import { db } from '../../firebase';
 import { generateUniqueCode } from '../../utils';
 
-const normalizeGameCode = (gameCode) =>
-  String(gameCode ?? '')
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, '')
-    .slice(0, 12);
-
-const getLobbyIdByCode = async ({ gameCode }) => {
-  const normalizedCode = normalizeGameCode(gameCode);
+const getLobbyIdByCode = async (gameCode) => {
+  const normalizedCode = String(gameCode ?? '')
+    .trim()
+    .toUpperCase();
   if (!normalizedCode) return '';
 
   const snapshot = await get(ref(db, `lobbyCodes/${normalizedCode}`));
   return snapshot.exists() ? String(snapshot.val()) : '';
 };
 
-const createGameSession = async ({ playerId, playerName, playerPin, type }) => {
+const createGameSession = async (playerName, playerPin, gameType) => {
   const lobbyId = push(ref(db, 'lobby')).key;
   if (!lobbyId) throw new Error('Failed to allocate lobby id.');
 
   let gameCode = '';
 
-  for (let attempt = 0; attempt < 10; attempt += 1) {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const candidateCode = generateUniqueCode();
     const existingSnapshot = await get(ref(db, `lobbyCodes/${candidateCode}`));
 
@@ -37,21 +34,17 @@ const createGameSession = async ({ playerId, playerName, playerPin, type }) => {
 
   await set(ref(db, `lobby/${lobbyId}`), {
     gameCode,
-    hostId: playerId,
-    maxPlayers: type === 'spades' ? 4 : 7,
-    minPlayers: type === 'spades' ? 4 : 4,
+    host: playerName,
     players: {
-      [playerId]: {
-        id: playerId,
+      [playerName]: {
         isHost: true,
         name: playerName,
         pin: playerPin,
         joinedAt: Date.now(),
       },
     },
-    status: 'lobby',
-    type,
-    variant: type === 'spades' ? 'classic' : 'uptown',
+    status: LOBBY_STATUS.WAITING,
+    gameType,
     createdAt: serverTimestamp(),
   });
 
@@ -60,41 +53,49 @@ const createGameSession = async ({ playerId, playerName, playerPin, type }) => {
   return { gameCode, lobbyId };
 };
 
-const joinGameSession = async ({ gameCode, playerId, playerName, playerPin }) => {
-  const lobbyId = await getLobbyIdByCode({ gameCode });
+const joinGameSession = async (gameCode, playerName, playerPin) => {
+  const normalizedCode = String(gameCode ?? '')
+    .trim()
+    .toUpperCase();
+  const lobbyId = await getLobbyIdByCode(normalizedCode);
   if (!lobbyId) return { error: 'Game not found.', lobbyId: '' };
 
   const snapshot = await get(ref(db, `lobby/${lobbyId}`));
   if (!snapshot.exists()) return { error: 'Game not found.', lobbyId: '' };
 
   const lobbyData = snapshot.val();
-  if (lobbyData.status !== 'lobby') return { error: 'Game has already started.', lobbyId: '' };
+  if (lobbyData.status !== LOBBY_STATUS.WAITING)
+    return { error: 'Game has already started.', lobbyId: '' };
 
   const players = lobbyData.players ?? {};
-  if (Object.keys(players).length >= lobbyData.maxPlayers)
-    return { error: 'Game is full.', lobbyId: '' };
+  const playerObj = players[playerName];
 
-  if (!players[playerId]) {
+  if (!playerObj) {
+    if (Object.keys(players).length >= (GAME_CONFIG[lobbyData.gameType]?.maxPlayers ?? 4)) {
+      return { error: 'Lobby is full.', lobbyId: '' };
+    }
     await update(ref(db, `lobby/${lobbyId}/players`), {
-      [playerId]: {
-        id: playerId,
+      [playerName]: {
         isHost: false,
         name: playerName,
         pin: playerPin,
         joinedAt: Date.now(),
       },
     });
+  } else if (String(playerObj.pin ?? '') !== String(playerPin ?? '')) {
+    return { error: 'Invalid details, try again.', lobbyId: '' };
   }
 
   return { error: '', lobbyId };
 };
 
-const updateVariant = async ({ lobbyId, variant }) => {
+const updateVariant = async (lobbyId, variant) => {
   await update(ref(db, `lobby/${lobbyId}`), { variant });
 };
 
-const startGame = async ({ lobbyId }) => {
-  await update(ref(db, `lobby/${lobbyId}`), { status: 'playing' });
+const startGame = async (lobbyId, variant) => {
+  console.log(lobbyId, variant);
+  await update(ref(db, `lobby/${lobbyId}`), { status: LOBBY_STATUS.IN_GAME, variant });
 };
 
 const subscribeToLobby = ({ lobbyId, onChange, onError }) => {
@@ -115,7 +116,6 @@ export const lobbyService = {
   createGameSession,
   getLobbyIdByCode,
   joinGameSession,
-  normalizeGameCode,
   startGame,
   subscribeToLobby,
   updateVariant,

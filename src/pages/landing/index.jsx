@@ -1,15 +1,9 @@
-import { useMemo } from 'react';
-
 import { Blocks, Loader2, LockKeyhole, ShieldCheck, Spade, User } from 'lucide-react';
+import { useState } from 'react';
 
-const Button = ({
-  children,
-  onClick,
-  variant = 'primary',
-  className = '',
-  disabled = false,
-  loading = false,
-}) => {
+import { GAME_TYPE } from '../../constants';
+
+const Button = ({ children, onClick, variant = 'primary', className = '', disabled = false }) => {
   const base =
     'relative overflow-hidden px-6 py-3 rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 ' +
     'disabled:opacity-50 disabled:cursor-not-allowed';
@@ -24,10 +18,10 @@ const Button = ({
   return (
     <button
       onClick={onClick}
-      disabled={disabled || loading}
+      disabled={disabled}
       className={`${base} ${variants[variant]} ${className}`}
     >
-      {loading ? <Loader2 className="animate-spin" size={20} /> : children}
+      {children}
     </button>
   );
 };
@@ -55,21 +49,15 @@ const Input = ({ placeholder, value, onChange, label, icon: Icon, type = 'text',
   </div>
 );
 
-export const LandingPage = ({
-  gameCode,
-  loading,
-  onCreateGame,
-  onJoinGame,
-  playerName,
-  playerPin,
-  setGameCode,
-  setPlayerName,
-  setPlayerPin,
-}) => {
-  const joinHandler = useMemo(() => onJoinGame, [onJoinGame]);
+export const LandingPage = ({ onCreateGame, onJoinGame }) => {
+  const [playerName, setPlayerName] = useState('');
+  const [playerPin, setPlayerPin] = useState('');
+  const [gameCode, setGameCode] = useState('');
+
+  const createHandler = (gameType) => onCreateGame(gameType, playerName, playerPin);
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center p-6 overflow-hidden relative">
+    <div className="min-h-screen text-white flex items-center justify-center p-6 overflow-hidden relative">
       <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-cyan-500/10 rounded-full blur-[160px]" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[160px]" />
       <div
@@ -103,7 +91,7 @@ export const LandingPage = ({
         >
           <div className="flex gap-4">
             <Input
-              label="Player Identity"
+              label="Player Name"
               placeholder="Enter Name"
               value={playerName}
               onChange={setPlayerName}
@@ -131,8 +119,7 @@ export const LandingPage = ({
             </label>
             <div className="grid grid-cols-2 gap-5">
               <button
-                onClick={() => onCreateGame('spades')}
-                disabled={loading}
+                onClick={() => createHandler(GAME_TYPE.SPADES)}
                 className="group flex flex-col items-center gap-4 p-5 rounded-3xl bg-slate-800/30 border border-white/5 hover:border-cyan-500/50
                 hover:bg-cyan-500/10 transition-all duration-500"
               >
@@ -141,10 +128,8 @@ export const LandingPage = ({
                 </div>
                 <span className="font-black text-sm tracking-wide">SPADES</span>
               </button>
-
               <button
-                onClick={() => onCreateGame('bidwhist')}
-                disabled={loading}
+                onClick={() => createHandler(GAME_TYPE.BID_WHIST)}
                 className="group flex flex-col items-center gap-4 p-5 rounded-3xl bg-slate-800/30 border border-white/5 hover:border-blue-500/50
                 hover:bg-blue-500/10 transition-all duration-500"
               >
@@ -171,7 +156,10 @@ export const LandingPage = ({
               icon={ShieldCheck}
               maxLength={6}
             />
-            <Button onClick={joinHandler} loading={loading} className="px-10 h-13">
+            <Button
+              onClick={() => onJoinGame(gameCode, playerName, playerPin)}
+              className="px-10 h-13"
+            >
               JOIN
             </Button>
           </div>
