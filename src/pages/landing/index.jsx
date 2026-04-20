@@ -1,5 +1,6 @@
-import { Blocks, Loader2, LockKeyhole, ShieldCheck, Spade, User } from 'lucide-react';
 import { useState } from 'react';
+
+import { Blocks, Loader2, LockKeyhole, ShieldCheck, Spade, User } from 'lucide-react';
 
 import { GAME_TYPE } from '../../constants';
 
@@ -57,7 +58,7 @@ export const LandingPage = ({ onCreateGame, onJoinGame }) => {
   const createHandler = (gameType) => onCreateGame(gameType, playerName, playerPin);
 
   return (
-    <div className="min-h-screen text-white flex items-center justify-center p-6 overflow-hidden relative">
+    <div className="min-h-screen text-white flex items-center justify-center p-4 sm:p-6 overflow-hidden relative">
       <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-cyan-500/10 rounded-full blur-[160px]" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[160px]" />
       <div
@@ -86,10 +87,10 @@ export const LandingPage = ({ onCreateGame, onJoinGame }) => {
           </div>
         </header>
         <div
-          className="bg-slate-900/40 backdrop-blur-3xl border border-white/5 px-10 py-8 rounded-[3rem] shadow-[0_30px_100px_rgba(0,0,0,0.5)] space-y-4
-            animate-in zoom-in-95 duration-700 delay-200 w-xl"
+          className="bg-slate-900/40 backdrop-blur-3xl border border-white/5 px-6 py-6 sm:px-10 sm:py-8 rounded-4xl sm:rounded-[3rem] space-y-4 animate-in
+            shadow-[0_30px_100px_rgba(0,0,0,0.5)] zoom-in-95 duration-700 delay-200 w-full sm:w-xl"
         >
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <Input
               label="Player Name"
               placeholder="Enter Name"
@@ -148,7 +149,7 @@ export const LandingPage = ({ onCreateGame, onJoinGame }) => {
               <span className="px-4 text-slate-600 font-bold">Join Session</span>
             </div>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <Input
               placeholder="Game Code"
               value={gameCode}
@@ -158,7 +159,7 @@ export const LandingPage = ({ onCreateGame, onJoinGame }) => {
             />
             <Button
               onClick={() => onJoinGame(gameCode, playerName, playerPin)}
-              className="px-10 h-13"
+              className="px-10 h-13 w-full sm:w-auto"
             >
               JOIN
             </Button>

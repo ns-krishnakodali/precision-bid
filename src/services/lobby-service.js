@@ -1,8 +1,8 @@
 import { get, onValue, push, ref, serverTimestamp, set, update } from 'firebase/database';
 
-import { GAME_CONFIG, LOBBY_STATUS, MAX_ATTEMPTS } from '../../constants';
-import { db } from '../../firebase';
-import { generateUniqueCode } from '../../utils';
+import { GAME_CONFIG, LOBBY_STATUS, MAX_ATTEMPTS } from '../constants';
+import { db } from '../firebase';
+import { generateUniqueCode } from '../utils';
 
 const getLobbyIdByCode = async (gameCode) => {
   const normalizedCode = String(gameCode ?? '')
@@ -94,7 +94,6 @@ const updateVariant = async (lobbyId, variant) => {
 };
 
 const startGame = async (lobbyId, variant) => {
-  console.log(lobbyId, variant);
   await update(ref(db, `lobby/${lobbyId}`), { status: LOBBY_STATUS.IN_GAME, variant });
 };
 

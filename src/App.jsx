@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { Loading, Toaster } from './components';
 import { GAME_CONFIG, GAME_STATE, LOBBY_STATUS } from './constants';
-import { ArenaPage, LobbyPage, LandingPage } from './pages';
+import { GameArenaPage, LobbyPage, LandingPage } from './pages';
 import { lobbyService } from './services';
 
 const App = () => {
@@ -130,11 +130,19 @@ const App = () => {
   };
 
   const handleStartGame = async (variant) => {
+    if (!variant) {
+      showToast({
+        message: 'Select a game variant.',
+        type: 'error',
+      });
+      return;
+    }
+
     const minPlayers = GAME_CONFIG[gameData?.gameType]?.minPlayers;
     if (gameData.players.length < minPlayers) {
       showToast({
         message: `Need at least ${minPlayers} players to start.`,
-        variant: 'error',
+        type: 'error',
       });
       return;
     }
@@ -168,7 +176,9 @@ const App = () => {
           onStartGame={handleStartGame}
         />
       )}
-      {view === GAME_STATE.GAME && <ArenaPage onAbortToLobby={() => setView(GAME_STATE.LOBBY)} />}
+      {view === GAME_STATE.GAME && (
+        <GameArenaPage onAbortToLobby={() => setView(GAME_STATE.LOBBY)} />
+      )}
     </div>
   );
 };

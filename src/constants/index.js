@@ -38,6 +38,10 @@ export const LOBBY_STATUS = {
   CANCELLED: 'CANCELLED',
 };
 
+export const CARD_VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+
+export const CARD_TYPES = ['spade', 'heart', 'diamond', 'club'];
+
 export const LOCAL_STORAGE_KEYS = {
   CLIENT_ID: 'precisionBid.clientId',
   DISPLAY_NAME: 'precisionBid.displayName',

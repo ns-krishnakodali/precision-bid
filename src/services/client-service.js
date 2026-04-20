@@ -1,5 +1,5 @@
-import { LOCAL_STORAGE_KEYS } from '../../constants';
-import { deleteStorageValue, getStorageValue, setStorageValue } from '../../utils';
+import { LOCAL_STORAGE_KEYS } from '../constants';
+import { deleteStorageValue, getStorageValue, setStorageValue } from '../utils';
 
 const getLegacyRawValue = (key) => {
   try {

@@ -29,9 +29,9 @@ const Button = ({
   );
 };
 
-export const ArenaPage = ({ onAbortToLobby }) => (
+export const GameArenaPage = ({ onAbortToLobby }) => (
   <div className="min-h-screen text-white flex items-center justify-center flex-col gap-6 relative overflow-hidden">
-    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(6,182,212,0.1)_0%,_transparent_70%)]" />
+    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.1)_0%,transparent_70%)]" />
     <div className="animate-in zoom-in-50 duration-1000 flex flex-col items-center gap-6 relative z-10">
       <div className="relative">
         <Layers size={80} className="text-cyan-500 animate-pulse" />

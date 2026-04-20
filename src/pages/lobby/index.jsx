@@ -163,7 +163,7 @@ export const LobbyPage = ({ gameData, playerName, onLeave, onStartGame }) => {
             {gameData.players.map((player, idx) => (
               <div
                 key={player.name}
-                className={`group flex items-center gap-5 p-5 rounded-4xl bg-slate-900/40 border border-white/5 backdrop-blur-xl animate-in slide-in-from-bottom-4
+                className={`group flex items-center gap-5 p-4 rounded-4xl bg-slate-900/40 border border-white/5 backdrop-blur-xl animate-in slide-in-from-bottom-4
                   duration-500 delay-${idx * 100}`}
               >
                 <div
