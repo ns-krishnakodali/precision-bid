@@ -15,3 +15,26 @@ button[disabled],
 [aria-disabled='true'] {
   cursor: not-allowed;
 }
+
+*::-webkit-scrollbar {
+  width: 0.5rem;
+  height: 0.5rem;
+  background-color: rgba(2, 6, 23, 0.75);
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(2, 6, 23, 0.55);
+  border-radius: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(34, 211, 238, 0.35), rgba(37, 99, 235, 0.35));
+  border-radius: 0.5rem;
+  transition: all 0.3s ease-in-out;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(34, 211, 238, 0.55), rgba(37, 99, 235, 0.55));
+  border-color: rgba(255, 255, 255, 0.18);
+}

@@ -49,7 +49,7 @@ const App = () => {
           return p1.joinedAt - p2.joinedAt;
         });
 
-        setGameData({ ...data, id: data.gameCode, players });
+        setGameData({ ...data, code: data.gameCode, players });
         if (data.status === LOBBY_STATUS.IN_GAME) setView(GAME_STATE.GAME);
       },
       onError: (dbErr) => {

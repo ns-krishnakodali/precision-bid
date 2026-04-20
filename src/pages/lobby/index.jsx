@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react';
+
 import {
   Check,
   ChevronRight,
@@ -12,7 +14,7 @@ import {
   Blocks,
   Bolt,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+
 import { BID_WHIST_VARIANT, GAME_CONFIG, GAME_TYPE, SPADES_VARIANT } from '../../constants';
 
 const Button = ({
@@ -82,18 +84,18 @@ export const LobbyPage = ({ gameData, playerName, onLeave, onStartGame }) => {
   };
 
   const copyCode = async () => {
-    if (!gameData?.id) return;
+    if (!gameData?.code) return;
 
     try {
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(gameData.id);
+        await navigator.clipboard.writeText(gameData.code);
         showCodeCopied();
         return;
       }
 
       const dummy = document.createElement('textarea');
       document.body.appendChild(dummy);
-      dummy.value = gameData.id;
+      dummy.value = gameData.code;
       dummy.select();
       const didCopy = document.execCommand('copy');
       document.body.removeChild(dummy);
@@ -134,7 +136,7 @@ export const LobbyPage = ({ gameData, playerName, onLeave, onStartGame }) => {
                   Game Code
                 </span>
                 <span className="text-2xl font-mono font-black text-cyan-500 leading-none">
-                  {gameData.id}
+                  {gameData.code}
                 </span>
               </div>
               <div
@@ -251,7 +253,7 @@ export const LobbyPage = ({ gameData, playerName, onLeave, onStartGame }) => {
                       }`}
                     >
                       <span className="capitalize font-black tracking-wide">{gameVariant}</span>
-                      {gameData.variant === gameVariant ? (
+                      {variant === gameVariant ? (
                         <div className="bg-white/20 p-1 rounded-md">
                           <ShieldCheck size={16} />
                         </div>
