@@ -177,7 +177,7 @@ const App = () => {
         />
       )}
       {view === GAME_STATE.GAME && (
-        <GameArenaPage onAbortToLobby={() => setView(GAME_STATE.LOBBY)} />
+        <GameArenaPage gameData={gameData} playerName={playerName} onLeave={handleLeave} />
       )}
     </div>
   );

@@ -1,3 +1,13 @@
+// Values
+export const HEART = 'heart';
+export const DIAMOND = 'diamond';
+export const CLUB = 'club';
+export const SPADE = 'spade';
+export const JOKER = 'joker';
+
+export const MAX_ATTEMPTS = 10;
+
+// Objects
 export const GAME_TYPE = {
   SPADES: 'Spades',
   BID_WHIST: 'BidWhist',
@@ -18,7 +28,6 @@ export const SPADES_VARIANT = {
   CLASSIC: 'Classic',
   OH_HELL: 'Oh Hell',
 };
-
 export const BID_WHIST_VARIANT = {
   UPTOWN: 'Uptown (Oh Hell)',
   DOWNTOWN: 'Downtown (Oh Hell)',
@@ -38,14 +47,17 @@ export const LOBBY_STATUS = {
   CANCELLED: 'CANCELLED',
 };
 
-export const CARD_VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-
-export const CARD_TYPES = ['spade', 'heart', 'diamond', 'club'];
-
-export const LOCAL_STORAGE_KEYS = {
-  CLIENT_ID: 'precisionBid.clientId',
-  DISPLAY_NAME: 'precisionBid.displayName',
+export const SUITE_META = {
+  [HEART]: { symbol: '\u2665', color: 'text-rose-500' },
+  [DIAMOND]: { symbol: '\u2666', color: 'text-rose-500' },
+  [CLUB]: { symbol: '\u2663', color: 'text-slate-800' },
+  [SPADE]: { symbol: '\u2663', color: 'text-slate-800' },
+  [JOKER]: { symbol: '\u2605', color: 'text-amber-300' },
 };
+
+// Arrays
+export const CARD_VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+export const CARD_TYPES = ['spade', 'heart', 'diamond', 'club'];
 
 export const LOADING_MESSAGES = [
   'Shuffling cards and preparing the deck',
@@ -55,4 +67,7 @@ export const LOADING_MESSAGES = [
   'Preparing trick play sequence',
 ];
 
-export const MAX_ATTEMPTS = 10;
+export const LOCAL_STORAGE_KEYS = {
+  CLIENT_ID: 'precisionBid.clientId',
+  DISPLAY_NAME: 'precisionBid.displayName',
+};

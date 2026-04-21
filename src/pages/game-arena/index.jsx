@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 
 import { BarChart3, LogOut, X, User } from 'lucide-react';
 
+import { SUITE_META } from '../../constants';
+
 const ActionButton = ({ children, onClick, variant = 'secondary', className = '' }) => {
   const base =
     'relative overflow-hidden px-5 py-3 rounded-xl font-black transition-all duration-300 flex items-center justify-center gap-2 active:scale-95';
@@ -20,21 +22,12 @@ const ActionButton = ({ children, onClick, variant = 'secondary', className = ''
   );
 };
 
-const getSuitMeta = (type) => {
-  const normalizedType = String(type ?? '').toLowerCase();
-
-  if (normalizedType === 'heart') return { symbol: '\u2665', color: 'text-rose-500' };
-  if (normalizedType === 'diamond') return { symbol: '\u2666', color: 'text-rose-500' };
-  if (normalizedType === 'club') return { symbol: '\u2663', color: 'text-slate-800' };
-  if (normalizedType === 'spade') return { symbol: '\u2660', color: 'text-slate-800' };
-
-  return { symbol: '\u2605', color: 'text-amber-300' };
-};
-
 const PlayingCard = ({ card, size = 'md', className = '' }) => {
   const value = card?.value ?? '';
-  const suit = card?.type ?? '';
-  const { symbol, color } = getSuitMeta(suit);
+  const suit = String(card?.type ?? '').toLowerCase();
+  const { symbol, color } = SUITE_META[suit];
+
+  //CHECK: Update the joker logic
   const isJoker = String(suit).toLowerCase() === 'joker' || String(value).toUpperCase() === 'JOKER';
 
   const sizes = {
@@ -213,7 +206,7 @@ const GameSeat = ({ player, totalSeats, seatIndex, playedCard }) => {
   );
 };
 
-export const GameArenaPage = ({ gameData, onAbortToLobby, onLeave, playerName }) => {
+export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
   const [isScorecardOpen, setIsScorecardOpen] = useState(false);
 
   const players = useMemo(() => {
@@ -279,11 +272,6 @@ export const GameArenaPage = ({ gameData, onAbortToLobby, onLeave, playerName })
     return `Waiting for ${waitingFor}`;
   }, [players]);
 
-  const leaveHandler = () => {
-    if (onLeave) onLeave();
-    else onAbortToLobby?.();
-  };
-
   return (
     <div className="min-h-screen text-white relative overflow-hidden">
       <div className="absolute top-[-30%] left-[-10%] w-[60%] h-[60%] bg-cyan-500/10 rounded-full blur-[160px]" />
@@ -293,7 +281,6 @@ export const GameArenaPage = ({ gameData, onAbortToLobby, onLeave, playerName })
           bg-[radial-gradient(#1e293b_1px,transparent_1px)] bg-size-[40px_40px]"
       />
       <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-cyan-500 to-transparent opacity-50" />
-
       <div className="relative z-10 p-4 sm:p-6 lg:p-10">
         <header className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-4 min-w-0">
@@ -309,19 +296,17 @@ export const GameArenaPage = ({ gameData, onAbortToLobby, onLeave, playerName })
               </p>
             </div>
           </div>
-
           <div className="flex items-center gap-3">
             <ActionButton onClick={() => setIsScorecardOpen(true)} className="h-12 px-5">
               <BarChart3 size={18} className="text-cyan-300" />
               <span className="hidden sm:inline">Scorecard</span>
             </ActionButton>
-            <ActionButton onClick={leaveHandler} variant="danger" className="h-12 px-5">
+            <ActionButton onClick={onLeave} variant="danger" className="h-12 px-5">
               <LogOut size={18} />
               <span className="hidden sm:inline">Leave Game</span>
             </ActionButton>
           </div>
         </header>
-
         <main className="mt-8 lg:mt-10 flex flex-col items-center">
           <div className="w-full max-w-6xl">
             <div className="relative w-full aspect-16/10 sm:aspect-video lg:aspect-18/9">
@@ -338,7 +323,6 @@ export const GameArenaPage = ({ gameData, onAbortToLobby, onLeave, playerName })
                   </div>
                 </div>
               </div>
-
               <div className="absolute inset-0">
                 {players.map((player, idx) => (
                   <GameSeat
@@ -350,7 +334,6 @@ export const GameArenaPage = ({ gameData, onAbortToLobby, onLeave, playerName })
                   />
                 ))}
               </div>
-
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="rounded-[2.25rem] p-px bg-linear-to-r from-cyan-500/35 via-white/10 to-blue-600/35 shadow-[0_30px_90px_rgba(0,0,0,0.55)]">
                   <div className="px-6 py-4 rounded-[2.2rem] bg-slate-950/55 border border-white/10 backdrop-blur-3xl text-center relative overflow-hidden">
@@ -367,7 +350,6 @@ export const GameArenaPage = ({ gameData, onAbortToLobby, onLeave, playerName })
                 </div>
               </div>
             </div>
-
             <div className="mt-10">
               <div className="flex items-end justify-between gap-4 px-2">
                 <div>
@@ -377,7 +359,6 @@ export const GameArenaPage = ({ gameData, onAbortToLobby, onLeave, playerName })
                   </p>
                 </div>
               </div>
-
               <div className="mt-4 p-4 sm:p-6 bg-slate-900/40 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.5)]">
                 <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                   {yourHand.map((card, idx) => (
@@ -398,7 +379,6 @@ export const GameArenaPage = ({ gameData, onAbortToLobby, onLeave, playerName })
           </div>
         </main>
       </div>
-
       <ScorecardModal
         isOpen={isScorecardOpen}
         onClose={() => setIsScorecardOpen(false)}

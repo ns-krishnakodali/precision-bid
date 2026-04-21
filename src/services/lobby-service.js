@@ -64,8 +64,6 @@ const joinGameSession = async (gameCode, playerName, playerPin) => {
   if (!snapshot.exists()) return { error: 'Game not found.', lobbyId: '' };
 
   const lobbyData = snapshot.val();
-  if (lobbyData.status !== LOBBY_STATUS.WAITING)
-    return { error: 'Game has already started.', lobbyId: '' };
 
   const players = lobbyData.players ?? {};
   const playerObj = players[playerName];
@@ -74,6 +72,10 @@ const joinGameSession = async (gameCode, playerName, playerPin) => {
     if (Object.keys(players).length >= (GAME_CONFIG[lobbyData.gameType]?.maxPlayers ?? 4)) {
       return { error: 'Lobby is full.', lobbyId: '' };
     }
+    if (lobbyData.status !== LOBBY_STATUS.WAITING) {
+      return { error: 'Game has already started.', lobbyId: '' };
+    }
+
     await update(ref(db, `lobby/${lobbyId}/players`), {
       [playerName]: {
         isHost: false,

@@ -69,9 +69,9 @@ export const LandingPage = ({ onCreateGame, onJoinGame }) => {
         <header className="animate-in fade-in slide-in-from-top-6 duration-1000">
           <div className="flex flex-col items-center justify-center">
             <div className="relative mb-6 group">
-              <div className="relative w-16 h-16 bg-slate-950 border border-white/10 rounded-2xl flex items-center justify-center rotate-45 transition-transform duration-700 ease-in-out group-hover:rotate-135 group-hover:shadow-[0_0_20px_2px_rgba(6,182,212,0.4)]">
+              <div className="relative w-18 h-18 bg-slate-950 border border-white/10 rounded-2xl flex items-center justify-center rotate-45 transition-transform duration-700 ease-in-out group-hover:rotate-135 group-hover:shadow-[0_0_20px_2px_rgba(6,182,212,0.4)]">
                 <div className="-rotate-45 transition-transform duration-700 ease-in-out group-hover:rotate-[-135deg] flex items-center justify-center w-full h-full">
-                  <img src="/logo.svg" className="w-14 h-14" />
+                  <img src="/logo.svg" className="w-18 h-18" />
                 </div>
               </div>
             </div>
