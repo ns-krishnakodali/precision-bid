@@ -55,6 +55,13 @@ export const LandingPage = ({ onCreateGame, onJoinGame }) => {
   const [playerPin, setPlayerPin] = useState('');
   const [gameCode, setGameCode] = useState('');
 
+  const formatAndSetPin = (value) =>
+    setPlayerPin(
+      String(value ?? '')
+        .replace(/\D/g, '')
+        .slice(0, 4)
+    );
+
   const createHandler = (gameType) => onCreateGame(gameType, playerName, playerPin);
 
   return (
@@ -71,7 +78,7 @@ export const LandingPage = ({ onCreateGame, onJoinGame }) => {
             <div className="relative mb-6 group">
               <div className="relative w-18 h-18 bg-slate-950 border border-white/10 rounded-2xl flex items-center justify-center rotate-45 transition-transform duration-700 ease-in-out group-hover:rotate-135 group-hover:shadow-[0_0_20px_2px_rgba(6,182,212,0.4)]">
                 <div className="-rotate-45 transition-transform duration-700 ease-in-out group-hover:rotate-[-135deg] flex items-center justify-center w-full h-full">
-                  <img src="/logo.svg" className="w-18 h-18" />
+                  <img src="/logo.svg" className="w-14 h-14" />
                 </div>
               </div>
             </div>
@@ -103,12 +110,7 @@ export const LandingPage = ({ onCreateGame, onJoinGame }) => {
               label="4-Digit PIN"
               placeholder="••••"
               value={playerPin}
-              onChange={(value) => {
-                const nextValue = String(value ?? '')
-                  .replace(/\D/g, '')
-                  .slice(0, 4);
-                setPlayerPin(nextValue);
-              }}
+              onChange={formatAndSetPin}
               icon={LockKeyhole}
               maxLength={4}
               type="password"
@@ -153,7 +155,7 @@ export const LandingPage = ({ onCreateGame, onJoinGame }) => {
             <Input
               placeholder="Game Code"
               value={gameCode}
-              onChange={setGameCode}
+              onChange={(value) => setGameCode(String(value ?? '').toUpperCase())}
               icon={ShieldCheck}
               maxLength={6}
             />
