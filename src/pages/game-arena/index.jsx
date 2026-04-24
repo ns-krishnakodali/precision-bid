@@ -255,10 +255,7 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
     <div className="min-h-screen text-white relative overflow-hidden">
       <div className="absolute top-[-30%] left-[-10%] w-[60%] h-[60%] bg-cyan-500/10 rounded-full blur-[160px]" />
       <div className="absolute bottom-[-35%] right-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[160px]" />
-      <div
-        className="absolute inset-0 opacity-20 pointer-events-none
-          bg-[radial-gradient(#1e293b_1px,transparent_1px)] bg-size-[40px_40px]"
-      />
+      <div className="absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(#1e293b_1px,transparent_1px)] bg-size-[40px_40px]" />
       <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-cyan-500 to-transparent opacity-50" />
       <div className="relative z-10 p-4 sm:p-6 lg:p-10">
         <header className="flex items-center justify-between gap-4">
@@ -318,7 +315,6 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
                 <div className="relative">
                   <div className="absolute -inset-2 rounded-full bg-cyan-500/20 blur-xl animate-pulse" />
-
                   <div className="relative rounded-full p-0.5 overflow-hidden">
                     <div
                       className="absolute inset-[-50%] animate-spin"
@@ -336,7 +332,6 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
                           <span className="absolute inline-flex h-2 w-2 rounded-full bg-cyan-400 opacity-75 animate-ping" />
                           <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.9)]" />
                         </span>
-
                         <div className="text-left leading-tight">
                           <p className="text-[10px] text-cyan-300/80 font-black uppercase tracking-[0.35em]">
                             Game Status
