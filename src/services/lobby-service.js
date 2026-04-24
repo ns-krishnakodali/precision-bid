@@ -1,8 +1,18 @@
 import { get, onValue, push, ref, serverTimestamp, set, update } from 'firebase/database';
 
-import { GAME_CONFIG, LOBBY_STATUS, MAX_ATTEMPTS } from '../constants';
+import {
+  BID_WHIST_VARIANT,
+  GAME_CONFIG,
+  GAME_ROUND,
+  GAME_TYPE,
+  LOBBY_STATUS,
+  MAX_ATTEMPTS,
+  MAX_ROUNDS,
+} from '../constants';
 import { db } from '../firebase';
 import { generateUniqueCode } from '../utils';
+
+import { dealCards } from './game-service';
 
 const getLobbyIdByCode = async (gameCode) => {
   const normalizedCode = String(gameCode ?? '')
@@ -96,7 +106,38 @@ const updateVariant = async (lobbyId, variant) => {
 };
 
 const startGame = async (lobbyId, variant) => {
-  await update(ref(db, `lobby/${lobbyId}`), { status: LOBBY_STATUS.IN_GAME, variant });
+  const snapshot = await get(ref(db, `lobby/${lobbyId}`));
+  if (!snapshot.exists()) throw new Error('Game session not found.');
+
+  const lobbyData = snapshot.val();
+  const playerNames = Object.keys(lobbyData?.players ?? {});
+
+  if (!playerNames.length) throw new Error('No players found in lobby.');
+
+  const currentRound = GAME_ROUND[variant];
+  if (!currentRound) {
+    throw new Error('Invalid variant. Please select a valid game variant before starting.');
+  }
+
+  const includeJokers =
+    lobbyData?.gameType === GAME_TYPE.BID_WHIST && variant !== BID_WHIST_VARIANT.NO_TRUMP;
+
+  const { players: dealtHands, remainingCards } = dealCards(playerNames.length, includeJokers);
+
+  const updates = {
+    [`lobby/${lobbyId}/status`]: LOBBY_STATUS.IN_GAME,
+    [`lobby/${lobbyId}/rounds`]: [],
+    [`lobby/${lobbyId}/currentRound`]: currentRound,
+    [`lobby/${lobbyId}/totalRounds`]: MAX_ROUNDS,
+    [`lobby/${lobbyId}/variant`]: variant,
+    [`lobby/${lobbyId}/remainingCards`]: remainingCards,
+  };
+
+  playerNames.forEach((name, idx) => {
+    updates[`lobby/${lobbyId}/players/${name}/cards`] = dealtHands[idx] ?? [];
+  });
+
+  await update(ref(db), updates);
 };
 
 const subscribeToLobby = ({ lobbyId, onChange, onError }) => {

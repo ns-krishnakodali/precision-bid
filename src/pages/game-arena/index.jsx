@@ -14,6 +14,7 @@ const getSeatPosition = ({ totalSeats, seatIndex, xRadiusPercent, yRadiusPercent
 const ActionButton = ({ children, onClick, variant = 'secondary', className = '' }) => {
   const base =
     'relative overflow-hidden p-3 rounded-xl font-black transition-all duration-300 flex items-center justify-center gap-2 active:scale-95';
+
   const variants = {
     primary:
       'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:shadow-[0_0_20px_rgba(6,182,212,0.4)]',
@@ -29,48 +30,65 @@ const ActionButton = ({ children, onClick, variant = 'secondary', className = ''
   );
 };
 
+const Border = () => (
+  <div className="relative mt-3 h-0.5 w-full overflow-hidden">
+    <div className="absolute inset-0 bg-linear-to-r from-transparent via-cyan-500/70 to-transparent" />
+    <div className="absolute inset-x-[18%] top-0 h-px bg-cyan-300/60 blur-sm" />
+  </div>
+);
+
 const PlayingCard = ({ card, size = 'md', className = '' }) => {
   const value = card?.value ?? '';
   const suit = String(card?.type ?? '').toLowerCase();
-  const { symbol, color } = SUITE_META[suit];
+  const { symbol = '★', color = 'text-slate-900' } = SUITE_META[suit] ?? {};
 
-  //CHECK: Update the joker logic
-  const isJoker = String(suit).toLowerCase() === 'joker' || String(value).toUpperCase() === 'JOKER';
+  const isJoker = suit === 'joker' || String(value).toUpperCase() === 'JOKER';
 
   const sizes = {
-    sm: 'w-14 h-21 rounded-lg',
+    xs: 'w-11 h-16 rounded-md',
+    sm: 'w-13 h-19 rounded-lg',
     md: 'w-20 h-28 rounded-xl',
+  };
+
+  const cornerTextSize = {
+    xs: 'text-[10px]',
+    sm: 'text-xs',
+    md: 'text-sm',
+  };
+
+  const centerTextSize = {
+    xs: 'text-xl',
+    sm: 'text-2xl',
+    md: 'text-5xl',
   };
 
   return (
     <div
-      className={`${sizes[size]} relative bg-linear-to-br from-white to-slate-50 text-slate-900 shadow-[0_20px_60px_rgba(0,0,0,0.55)] border border-white/60
-        ${className}`}
+      className={`${sizes[size]} relative bg-linear-to-br from-white to-slate-50 text-slate-900 shadow-[0_16px_35px_rgba(0,0,0,0.5)] border
+        border-white/60${className}`}
     >
       <div className="absolute inset-0 rounded-[inherit] ring-1 ring-black/10 pointer-events-none" />
       {isJoker ? (
         <div className="w-full h-full flex items-center justify-center">
-          <div className="text-center px-3">
-            <p className="text-[10px] font-black tracking-[0.4em] text-slate-600">JOKER</p>
-            <p className="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-linear-to-r from-cyan-500 to-blue-600">
+          <div className="text-center px-2">
+            <p className="text-[8px] font-black tracking-[0.3em] text-slate-600">JOKER</p>
+            <p className="text-2xl font-black tracking-tight text-transparent bg-clip-text bg-linear-to-r from-cyan-500 to-blue-600">
               ★
             </p>
           </div>
         </div>
       ) : (
         <>
-          <div className={`absolute top-2 left-2 ${color}`}>
-            <div className="text-sm font-black leading-none">{value}</div>
-            <div className="text-sm leading-none -mt-0.5">{symbol}</div>
+          <div className={`absolute top-1.5 left-1.5 ${color}`}>
+            <div className={`${cornerTextSize[size]} font-black leading-none`}>{value}</div>
+            <div className={`${cornerTextSize[size]} leading-none -mt-0.5`}>{symbol}</div>
           </div>
-          <div className={`absolute bottom-2 right-2 ${color} rotate-180`}>
-            <div className="text-sm font-black leading-none">{value}</div>
-            <div className="text-sm leading-none -mt-0.5">{symbol}</div>
+          <div className={`absolute bottom-1.5 right-1.5 ${color} rotate-180`}>
+            <div className={`${cornerTextSize[size]} font-black leading-none`}>{value}</div>
+            <div className={`${cornerTextSize[size]} leading-none -mt-0.5`}>{symbol}</div>
           </div>
           <div className={`absolute inset-0 flex items-center justify-center ${color}`}>
-            <div className={`${size === 'sm' ? 'text-2xl' : 'text-5xl'} drop-shadow-sm`}>
-              {symbol}
-            </div>
+            <div className={`${centerTextSize[size]} drop-shadow-sm`}>{symbol}</div>
           </div>
         </>
       )}
@@ -85,34 +103,38 @@ const PlayerCard = ({ player }) => {
 
   return (
     <div
-      className={`relative rounded-xl sm:rounded-2xl border backdrop-blur-xl px-2.5 py-1.5  shadow-[0_10px_30px_rgba(0,0,0,0.55)] w-27 sm:w-32 flex
-        flex-col items-center text-center
-      ${
+      className={`relative rounded-xl border backdrop-blur-xl px-2.5 py-1.5 shadow-[0_10px_25px_rgba(0,0,0,0.5)] w-25 sm:w-30 flex flex-col items-center text-center ${
         player.isYou
-          ? 'bg-cyan-500/20 border-cyan-400/50 shadow-[0_0_25px_rgba(6,182,212,0.35)]'
+          ? 'bg-cyan-500/20 border-cyan-400/50 shadow-[0_0_22px_rgba(6,182,212,0.35)]'
           : 'bg-slate-950/80 border-white/15'
       }`}
     >
-      <p
-        className={`text-sm font-black tracking-tight truncate ${
-          player.isYou ? 'text-cyan-100' : 'text-white'
-        }`}
-        title={player.name}
-      >
-        {player.name}
-      </p>
-      <div className="mt-1 flex items-center justify-center gap-2 w-full">
-        <div className="flex-1 leading-tight flex flex-col items-center">
-          <p className="text-[8px] text-slate-400 font-black uppercase tracking-[0.2em]">Bid</p>
-          <p className="text-sm sm:text-base font-black text-white tabular-nums leading-none mt-0.5">
-            {bids}
-          </p>
+      <div className="w-full flex items-center justify-center gap-1.5 min-w-0">
+        <span
+          className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+            player.isYou ? 'bg-cyan-300 shadow-[0_0_8px_rgba(103,232,249,0.9)]' : 'bg-slate-500'
+          }`}
+        />
+        <p
+          className={`text-xs sm:text-sm font-black tracking-tight truncate ${
+            player.isYou ? 'text-cyan-100' : 'text-white'
+          }`}
+          title={player.name}
+        >
+          {player.name}
+        </p>
+      </div>
+
+      <div className="mt-1.5 grid grid-cols-2 gap-1.5 w-full">
+        <div className="rounded-lg bg-white/5 border border-white/5 px-1.5 py-1 leading-none">
+          <p className="text-[7px] text-slate-400 font-black uppercase tracking-[0.18em]">Bid</p>
+          <p className="mt-0.5 text-xs sm:text-sm font-black text-white tabular-nums">{bids}</p>
         </div>
-        <div className="w-px h-5 sm:h-6 bg-white/15" />
-        <div className="flex-1 leading-tight flex flex-col items-center">
-          <p className="text-[8px] text-slate-400 font-black uppercase tracking-[0.2em]">Wins</p>
+
+        <div className="rounded-lg bg-white/5 border border-white/5 px-1.5 py-1 leading-none">
+          <p className="text-[7px] text-slate-400 font-black uppercase tracking-[0.18em]">Wins</p>
           <p
-            className={`text-sm sm:text-base font-black tabular-nums leading-none mt-0.5 ${
+            className={`mt-0.5 text-xs sm:text-sm font-black tabular-nums ${
               met ? 'text-emerald-300' : 'text-white'
             }`}
           >
@@ -125,46 +147,40 @@ const PlayerCard = ({ player }) => {
 };
 
 const GameSeat = ({ player, totalSeats, seatIndex, playedCard }) => {
-  const cardHolder = getSeatPosition({
+  const playersPosition = getSeatPosition({
     totalSeats,
     seatIndex,
-    xRadiusPercent: 36,
-    yRadiusPercent: 34,
-  });
-
-  const playedPos = getSeatPosition({
-    totalSeats,
-    seatIndex,
-    xRadiusPercent: 19,
-    yRadiusPercent: 19,
+    xRadiusPercent: 37,
+    yRadiusPercent: 31,
   });
 
   return (
-    <>
-      <div
-        className="absolute z-20"
-        style={{
-          left: `${cardHolder.x}%`,
-          top: `${cardHolder.y}%`,
-          transform: 'translate(-50%, -50%)',
-        }}
-      >
-        <PlayerCard player={player} />
-      </div>
-
-      {playedCard ? (
-        <div
-          className="absolute z-10"
-          style={{
-            left: `${playedPos.x}%`,
-            top: `${playedPos.y}%`,
-            transform: 'translate(-50%, -50%)',
-          }}
-        >
-          <PlayingCard card={playedCard} size="sm" className="transition-transform duration-300" />
+    <div
+      className="absolute z-20"
+      style={{
+        left: `${playersPosition.x}%`,
+        top: `${playersPosition.y}%`,
+        transform: 'translate(-50%, -50%)',
+      }}
+    >
+      <div className="relative flex flex-col items-center gap-1.5 sm:gap-2">
+        {playedCard ? (
+          <div className="relative z-20 -mb-0.5">
+            <div className="absolute inset-x-2 bottom-0 h-3 rounded-full bg-cyan-400/20 blur-md" />
+            <PlayingCard
+              card={playedCard}
+              size="xs"
+              className="relative transition-transform duration-300 hover:-translate-y-1"
+            />
+          </div>
+        ) : (
+          <div className="h-16" />
+        )}
+        <div className="relative z-10">
+          <PlayerCard player={player} />
         </div>
-      ) : null}
-    </>
+      </div>
+    </div>
   );
 };
 
@@ -195,11 +211,17 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
 
     if (incomingPlayers.length) {
       const normalized = normalize(incomingPlayers);
-      if (!normalized.some((p) => p.isYou) && normalized.length) normalized[0].isYou = true;
+
+      if (!normalized.some((p) => p.isYou) && normalized.length) {
+        normalized[0].isYou = true;
+      }
+
       const youIndex = normalized.findIndex((p) => p.isYou);
+
       if (youIndex > 0) {
         return [...normalized.slice(youIndex), ...normalized.slice(0, youIndex)];
       }
+
       return normalized;
     }
 
@@ -256,16 +278,12 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
       <div className="absolute top-[-30%] left-[-10%] w-[60%] h-[60%] bg-cyan-500/10 rounded-full blur-[160px]" />
       <div className="absolute bottom-[-35%] right-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[160px]" />
       <div className="absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(#1e293b_1px,transparent_1px)] bg-size-[40px_40px]" />
-      <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-cyan-500 to-transparent opacity-50" />
-      <div className="relative z-10 p-4 sm:p-6 lg:p-10">
+      <div className="relative z-10 px-8 py-6">
         <header className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <div className="relative shrink-0">
               <div className="absolute inset-0 rounded-2xl bg-cyan-500/20 blur-xl" />
-              <div
-                className="relative w-18 h-18 rounded-2xl bg-slate-900/80 border border-white/10 backdrop-blur-xl flex items-center justify-center
-                  shadow-[0_10px_30px_rgba(0,0,0,0.5)]"
-              >
+              <div className="relative w-18 h-18 rounded-2xl bg-slate-900/80 border border-white/10 backdrop-blur-xl flex items-center justify-center shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
                 <img src="/logo.svg" className="w-14 h-14" />
               </div>
             </div>
@@ -289,6 +307,7 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
             </ActionButton>
           </div>
         </header>
+        <Border />
         <main className="mt-4 flex flex-col items-center">
           <div className="w-full max-w-7xl">
             <div
@@ -348,7 +367,7 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
               <div className="absolute inset-0">
                 {players.map((player, idx) => (
                   <GameSeat
-                    key={player.id}
+                    key={idx}
                     player={player}
                     totalSeats={players.length}
                     seatIndex={idx}
@@ -357,6 +376,7 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
                 ))}
               </div>
             </div>
+            <Border />
             <div className="mt-6">
               <div className="flex items-end justify-between gap-4 px-2">
                 <div>
@@ -380,16 +400,13 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
                 className="mt-3 sm:mt-4 px-3 sm:px-5 lg:px-6 pt-5 sm:pt-6 pb-3 sm:pb-4 bg-slate-900/40 backdrop-blur-3xl border border-white/5 rounded-[1.75rem]
                   sm:rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.5)]"
               >
-                <div className="flex flex-wrap justify-center gap-2 sm:gap-3 pt-2 pb-2">
+                <div className="flex flex-wrap justify-center gap-3.5 pt-2 pb-2">
                   {yourHand.map((card, idx) => (
-                    <button
-                      key={`${card.value}_${card.type}_${idx}`}
-                      className="shrink-0 active:scale-95 transition-transform duration-200 group"
-                    >
+                    <button key={`${card.value}_${card.type}_${idx}`}>
                       <PlayingCard
                         card={card}
                         size="md"
-                        className="group-hover:-translate-y-1 transition-transform duration-200"
+                        className="transition-transform duration-300 hover:-translate-y-1"
                       />
                     </button>
                   ))}
@@ -406,10 +423,7 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
             className="absolute inset-0 bg-[#020617]/80 backdrop-blur-md"
             aria-label="Close scorecard"
           />
-          <div
-            className="w-full max-w-xl relative z-10 bg-slate-900/40 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] shadow-[0_30px_120px_rgba(0,0,0,0.65)]
-              overflow-hidden animate-in fade-in zoom-in-95 duration-200"
-          >
+          <div className="w-full max-w-xl relative z-10 bg-slate-900/40 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] shadow-[0_30px_120px_rgba(0,0,0,0.65)] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.12)_0%,transparent_55%)]" />
             <div className="relative z-10 p-6 sm:p-8">
               <div className="flex items-start justify-between gap-4">
@@ -436,7 +450,7 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
                   .sort((p1, p2) => (p2.score ?? 0) - (p1.score ?? 0))
                   .map((player, idx) => (
                     <div
-                      key={player.id}
+                      key={idx}
                       className={`flex items-center justify-between gap-4 p-4 rounded-2xl border transition-colors ${
                         idx === 0
                           ? 'bg-cyan-500/10 border-cyan-500/20'

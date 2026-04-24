@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { Loading, Toaster } from './components';
-import { GAME_CONFIG, GAME_STATE, LOBBY_STATUS } from './constants';
+import { GAME_CONFIG, GAME_STATE, LOBBY_DETAILS, LOBBY_STATUS } from './constants';
 import { GameArenaPage, LobbyPage, LandingPage } from './pages';
 import { lobbyService } from './services';
+import { deleteStorageValue, getStorageValue, setStorageValue } from './utils';
 
 const App = () => {
-  const [view, setView] = useState(GAME_STATE.LANDING);
+  const initialLobbyDetails = getStorageValue(LOBBY_DETAILS, {});
+
+  const [view, setView] = useState(initialLobbyDetails?.gameState ?? GAME_STATE.LANDING);
   const [gameData, setGameData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [playerName, setPlayerName] = useState('');
-  const [lobbyId, setLobbyId] = useState('');
+  const [playerName, setPlayerName] = useState(String(initialLobbyDetails?.playerName ?? ''));
+  const [lobbyId, setLobbyId] = useState(String(initialLobbyDetails?.lobbyId ?? ''));
   const [toast, setToast] = useState(null);
 
   const dismissToast = useCallback(() => {
@@ -38,17 +41,17 @@ const App = () => {
           setView(GAME_STATE.LANDING);
           setGameData(null);
           setLobbyId('');
+          setPlayerName('');
+          deleteStorageValue(LOBBY_DETAILS);
           showToast({ message: 'Game session has ended.', type: 'info' });
           return;
         }
 
-        const playersObject = data.players ?? {};
-        const players = Object.values(playersObject).sort((p1, p2) => {
+        const players = Object.values(data.players ?? {})?.sort((p1, p2) => {
           if (p1.isHost && !p2.isHost) return -1;
           if (!p1.isHost && p2.isHost) return 1;
           return p1.joinedAt - p2.joinedAt;
         });
-
         setGameData({ ...data, code: data.gameCode, players });
         if (data.status === LOBBY_STATUS.IN_GAME) setView(GAME_STATE.GAME);
       },
@@ -78,6 +81,12 @@ const App = () => {
       const { gameCode: createdGameCode, lobbyId: newLobbyId } =
         await lobbyService.createGameSession(pName, playerPin, gameType);
 
+      setStorageValue(LOBBY_DETAILS, {
+        gameCode: createdGameCode,
+        gameState: GAME_STATE.LOBBY,
+        lobbyId: newLobbyId,
+        playerName: pName,
+      });
       setLobbyId(newLobbyId);
       setView(GAME_STATE.LOBBY);
       showToast({ message: `Game created. Code: ${createdGameCode}`, type: 'success' });
@@ -118,6 +127,12 @@ const App = () => {
         return;
       }
 
+      setStorageValue(LOBBY_DETAILS, {
+        gameCode: String(newGameCode ?? ''),
+        gameState: GAME_STATE.LOBBY,
+        lobbyId: foundLobbyId,
+        playerName: pName,
+      });
       setLobbyId(foundLobbyId);
       setView(GAME_STATE.LOBBY);
       showToast({ message: 'Joined lobby.', type: 'success' });
@@ -148,19 +163,28 @@ const App = () => {
     }
     try {
       await lobbyService.startGame(lobbyId, variant);
+      setStorageValue(LOBBY_DETAILS, {
+        gameCode: gameData?.code ?? '',
+        gameState: GAME_STATE.GAME,
+        lobbyId,
+        playerName,
+      });
     } catch {
       showToast({ message: 'Failed to start game.', type: 'error' });
     }
   };
 
   const handleLeave = () => {
+    deleteStorageValue(LOBBY_DETAILS);
     setView(GAME_STATE.LANDING);
     setGameData(null);
     setLobbyId('');
+    setPlayerName('');
     setToast(null);
   };
 
   if (loading) return <Loading />;
+  if (view !== GAME_STATE.LANDING && lobbyId && !gameData) return <Loading />;
 
   return (
     <div className="font-sans antialiased bg-[#020617] selection:bg-cyan-500 selection:text-white">
@@ -168,7 +192,7 @@ const App = () => {
       {view === GAME_STATE.LANDING && (
         <LandingPage onCreateGame={handleCreateGame} onJoinGame={handleJoinGame} />
       )}
-      {view === GAME_STATE.LOBBY && gameData && (
+      {view === GAME_STATE.LOBBY && (
         <LobbyPage
           gameData={gameData}
           playerName={playerName}

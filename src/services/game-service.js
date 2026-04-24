@@ -1,10 +1,10 @@
-import { CARD_TYPES, CARD_VALUES } from '../constants';
+import { CARD_TYPES, CARD_VALUES, JOKER } from '../constants';
 
 const buildDeck = (includeJokers) => {
   const deck = CARD_TYPES.flatMap((type) => CARD_VALUES.map((value) => ({ value, type })));
 
   if (includeJokers) {
-    deck.push({ value: 'JOKER', type: 'joker' }, { value: 'JOKER', type: 'joker' });
+    deck.push({ value: JOKER, type: 'joker' }, { value: JOKER, type: 'joker' });
   }
 
   return deck;
@@ -36,7 +36,7 @@ export const dealCards = (numPlayers, includeJokers = false) => {
 
   return {
     players,
-    leftovers: shuffledDeck.slice(playersCount * cardsPerPlayer),
+    remainingCards: shuffledDeck.slice(playersCount * cardsPerPlayer),
   };
 };
 
