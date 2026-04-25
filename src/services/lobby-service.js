@@ -2,17 +2,16 @@ import { get, onValue, push, ref, serverTimestamp, set, update } from 'firebase/
 
 import {
   BID_WHIST_VARIANT,
+  BIDDING,
   GAME_CONFIG,
-  GAME_ROUND,
+  GAME_ROUNDS,
   GAME_TYPE,
   LOBBY_STATUS,
   MAX_ATTEMPTS,
-  MAX_ROUNDS,
 } from '../constants';
 import { db } from '../firebase';
-import { generateUniqueCode } from '../utils';
-
-import { dealCards } from './game-service';
+import { dealCards, generateUniqueCode } from '../utils';
+import { gameService } from './game-service';
 
 const getLobbyIdByCode = async (gameCode) => {
   const normalizedCode = String(gameCode ?? '')
@@ -114,30 +113,45 @@ const startGame = async (lobbyId, variant) => {
 
   if (!playerNames.length) throw new Error('No players found in lobby.');
 
-  const currentRound = GAME_ROUND[variant];
+  const currentRound = GAME_ROUNDS[variant];
   if (!currentRound) {
     throw new Error('Invalid variant. Please select a valid game variant before starting.');
+  }
+
+  const shuffledPlayerNames = [...playerNames];
+  for (let idx = shuffledPlayerNames.length - 1; idx > 0; idx--) {
+    const randIdx = Math.floor(Math.random() * (idx + 1));
+    [shuffledPlayerNames[idx], shuffledPlayerNames[randIdx]] = [
+      shuffledPlayerNames[randIdx],
+      shuffledPlayerNames[idx],
+    ];
   }
 
   const includeJokers =
     lobbyData?.gameType === GAME_TYPE.BID_WHIST && variant !== BID_WHIST_VARIANT.NO_TRUMP;
 
-  const { players: dealtHands, remainingCards } = dealCards(playerNames.length, includeJokers);
+  const { players: dealtHands, remainingCards } = dealCards(
+    shuffledPlayerNames.length,
+    includeJokers
+  );
 
   const updates = {
     [`lobby/${lobbyId}/status`]: LOBBY_STATUS.IN_GAME,
-    [`lobby/${lobbyId}/rounds`]: [],
-    [`lobby/${lobbyId}/currentRound`]: currentRound,
-    [`lobby/${lobbyId}/totalRounds`]: MAX_ROUNDS,
+    [`lobby/${lobbyId}/currentRound`]: currentRound - 1,
     [`lobby/${lobbyId}/variant`]: variant,
     [`lobby/${lobbyId}/remainingCards`]: remainingCards,
+    [`lobby/${lobbyId}/currentPlayer`]: shuffledPlayerNames[0],
   };
 
-  playerNames.forEach((name, idx) => {
+  shuffledPlayerNames.forEach((name, idx) => {
     updates[`lobby/${lobbyId}/players/${name}/cards`] = dealtHands[idx] ?? [];
+    updates[`lobby/${lobbyId}/players/${name}/order`] = idx + 1;
+    updates[`lobby/${lobbyId}/players/${name}/score`] = 0;
+    updates[`lobby/${lobbyId}/players/${name}/accumulated`] = 0;
   });
 
   await update(ref(db), updates);
+  await gameService.addNewRound(lobbyId);
 };
 
 const subscribeToLobby = ({ lobbyId, onChange, onError }) => {

@@ -47,7 +47,8 @@ const App = () => {
           return;
         }
 
-        const players = Object.values(data.players ?? {})?.sort((p1, p2) => {
+        const players = Object.values(data.players ?? {}).sort((p1, p2) => {
+          if (p1?.order != null && p2?.order != null) return p1.order - p2.order;
           if (p1.isHost && !p2.isHost) return -1;
           if (!p1.isHost && p2.isHost) return 1;
           return p1.joinedAt - p2.joinedAt;
@@ -144,6 +145,17 @@ const App = () => {
     }
   };
 
+  const handleUpdateVariant = async (variant) => {
+    if (!variant) return;
+
+    try {
+      await lobbyService.updateVariant(lobbyId, variant);
+    } catch (variantErr) {
+      console.error('Variant update error:', variantErr);
+      showToast({ message: 'Failed to update variant.', type: 'error' });
+    }
+  };
+
   const handleStartGame = async (variant) => {
     if (!variant) {
       showToast({
@@ -196,12 +208,18 @@ const App = () => {
         <LobbyPage
           gameData={gameData}
           playerName={playerName}
-          onLeave={handleLeave}
+          onVariantChange={handleUpdateVariant}
           onStartGame={handleStartGame}
+          onLeave={handleLeave}
         />
       )}
       {view === GAME_STATE.GAME && (
-        <GameArenaPage gameData={gameData} playerName={playerName} onLeave={handleLeave} />
+        <GameArenaPage
+          lobbyId={lobbyId}
+          gameData={gameData}
+          playerName={playerName}
+          onLeave={handleLeave}
+        />
       )}
     </div>
   );

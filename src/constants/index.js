@@ -5,9 +5,16 @@ export const CLUB = 'club';
 export const SPADE = 'spade';
 export const JOKER = 'joker';
 
+export const BIG_JOKER = 'BJ';
+export const SMALL_JOKER = 'SJ';
+
 export const MAX_ATTEMPTS = 10;
 export const MAX_ROUNDS = 13;
+export const MAX_ACCUMULATED = 5;
 export const LOBBY_DETAILS = 'LOBBY_DETAILS';
+
+export const BIDDING = 'Bidding';
+export const PLAYING = 'Playing';
 
 // Objects
 export const GAME_STATE = {
@@ -50,20 +57,20 @@ export const GAME_CONFIG = {
   },
 };
 
-export const GAME_ROUND = {
-  [SPADES_VARIANT.CLASSIC]: 13,
-  [SPADES_VARIANT.OH_HELL]: 1,
-  [BID_WHIST_VARIANT.UPTOWN]: 1,
-  [BID_WHIST_VARIANT.DOWNTOWN]: 1,
-  [BID_WHIST_VARIANT.NO_TRUMP]: 13,
+export const GAME_ROUNDS = {
+  [SPADES_VARIANT.CLASSIC]: 12,
+  [SPADES_VARIANT.OH_HELL]: 0,
+  [BID_WHIST_VARIANT.UPTOWN]: 0,
+  [BID_WHIST_VARIANT.DOWNTOWN]: 0,
+  [BID_WHIST_VARIANT.NO_TRUMP]: 12,
 };
 
 export const SUITE_META = {
   [HEART]: { symbol: '\u2665', color: 'text-rose-500' },
   [DIAMOND]: { symbol: '\u2666', color: 'text-rose-500' },
   [CLUB]: { symbol: '\u2663', color: 'text-slate-800' },
-  [SPADE]: { symbol: '\u2663', color: 'text-slate-800' },
-  [JOKER]: { symbol: '\u2605', color: 'text-amber-300' },
+  [SPADE]: { symbol: '\u2660', color: 'text-slate-800' },
+  [JOKER]: { symbol: '\u2605', color: 'text-violet-600' },
 };
 
 // Arrays

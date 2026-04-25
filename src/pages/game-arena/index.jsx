@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { BarChart3, LogOut, X, User } from 'lucide-react';
 
-import { SUITE_META } from '../../constants';
+import { BIDDING, JOKER, SUITE_META } from '../../constants';
 
 const getSeatPosition = ({ totalSeats, seatIndex, xRadiusPercent, yRadiusPercent }) => {
   const angle = Math.PI / 2 - (Math.PI * 2 * seatIndex) / totalSeats;
@@ -40,9 +40,7 @@ const Border = () => (
 const PlayingCard = ({ card, size = 'md', className = '' }) => {
   const value = card?.value ?? '';
   const suit = String(card?.type ?? '').toLowerCase();
-  const { symbol = '★', color = 'text-slate-900' } = SUITE_META[suit] ?? {};
-
-  const isJoker = suit === 'joker' || String(value).toUpperCase() === 'JOKER';
+  const { symbol, color } = SUITE_META[suit] ?? {};
 
   const sizes = {
     xs: 'w-11 h-16 rounded-md',
@@ -68,35 +66,22 @@ const PlayingCard = ({ card, size = 'md', className = '' }) => {
         border-white/60${className}`}
     >
       <div className="absolute inset-0 rounded-[inherit] ring-1 ring-black/10 pointer-events-none" />
-      {isJoker ? (
-        <div className="w-full h-full flex items-center justify-center">
-          <div className="text-center px-2">
-            <p className="text-[8px] font-black tracking-[0.3em] text-slate-600">JOKER</p>
-            <p className="text-2xl font-black tracking-tight text-transparent bg-clip-text bg-linear-to-r from-cyan-500 to-blue-600">
-              ★
-            </p>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className={`absolute top-1.5 left-1.5 ${color}`}>
-            <div className={`${cornerTextSize[size]} font-black leading-none`}>{value}</div>
-            <div className={`${cornerTextSize[size]} leading-none -mt-0.5`}>{symbol}</div>
-          </div>
-          <div className={`absolute bottom-1.5 right-1.5 ${color} rotate-180`}>
-            <div className={`${cornerTextSize[size]} font-black leading-none`}>{value}</div>
-            <div className={`${cornerTextSize[size]} leading-none -mt-0.5`}>{symbol}</div>
-          </div>
-          <div className={`absolute inset-0 flex items-center justify-center ${color}`}>
-            <div className={`${centerTextSize[size]} drop-shadow-sm`}>{symbol}</div>
-          </div>
-        </>
-      )}
+      <div className={`absolute top-1.5 left-1.5 ${color}`}>
+        <div className={`${cornerTextSize[size]} font-black leading-none`}>{value}</div>
+        <div className={`${cornerTextSize[size]} leading-none -mt-0.5`}>{symbol}</div>
+      </div>
+      <div className={`absolute bottom-1.5 right-1.5 ${color} rotate-180`}>
+        <div className={`${cornerTextSize[size]} font-black leading-none`}>{value}</div>
+        <div className={`${cornerTextSize[size]} leading-none -mt-0.5`}>{symbol}</div>
+      </div>
+      <div className={`absolute inset-0 flex items-center justify-center ${color}`}>
+        <div className={`${centerTextSize[size]} drop-shadow-sm`}>{symbol}</div>
+      </div>
     </div>
   );
 };
 
-const PlayerCard = ({ player }) => {
+const PlayerCard = ({ player, isPlayerTurn = false }) => {
   const bids = player.bids ?? 0;
   const wins = player.wins ?? 0;
   const met = bids > 0 && wins >= bids;
@@ -104,7 +89,7 @@ const PlayerCard = ({ player }) => {
   return (
     <div
       className={`relative rounded-xl border backdrop-blur-xl px-2.5 py-1.5 shadow-[0_10px_25px_rgba(0,0,0,0.5)] w-25 sm:w-30 flex flex-col items-center text-center ${
-        player.isYou
+        isPlayerTurn
           ? 'bg-cyan-500/20 border-cyan-400/50 shadow-[0_0_22px_rgba(6,182,212,0.35)]'
           : 'bg-slate-950/80 border-white/15'
       }`}
@@ -112,19 +97,18 @@ const PlayerCard = ({ player }) => {
       <div className="w-full flex items-center justify-center gap-1.5 min-w-0">
         <span
           className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-            player.isYou ? 'bg-cyan-300 shadow-[0_0_8px_rgba(103,232,249,0.9)]' : 'bg-slate-500'
+            isPlayerTurn ? 'bg-cyan-300 shadow-[0_0_8px_rgba(103,232,249,0.9)]' : 'bg-slate-500'
           }`}
         />
         <p
           className={`text-xs sm:text-sm font-black tracking-tight truncate ${
-            player.isYou ? 'text-cyan-100' : 'text-white'
+            isPlayerTurn ? 'text-cyan-100' : 'text-white'
           }`}
           title={player.name}
         >
           {player.name}
         </p>
       </div>
-
       <div className="mt-1.5 grid grid-cols-2 gap-1.5 w-full">
         <div className="rounded-lg bg-white/5 border border-white/5 px-1.5 py-1 leading-none">
           <p className="text-[7px] text-slate-400 font-black uppercase tracking-[0.18em]">Bid</p>
@@ -146,7 +130,7 @@ const PlayerCard = ({ player }) => {
   );
 };
 
-const GameSeat = ({ player, totalSeats, seatIndex, playedCard }) => {
+const GameSeat = ({ player, totalSeats, seatIndex, playedCard, isPlayerTurn }) => {
   const playersPosition = getSeatPosition({
     totalSeats,
     seatIndex,
@@ -177,15 +161,16 @@ const GameSeat = ({ player, totalSeats, seatIndex, playedCard }) => {
           <div className="h-16" />
         )}
         <div className="relative z-10">
-          <PlayerCard player={player} />
+          <PlayerCard player={player} isPlayerTurn={isPlayerTurn} />
         </div>
       </div>
     </div>
   );
 };
 
-export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
-  const [isScorecardOpen, setIsScorecardOpen] = useState(false);
+export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
+  const [openScorecardModal, setOpenScoreCardModal] = useState(false);
+
   const tableRef = useRef(null);
 
   useEffect(() => {
@@ -197,61 +182,25 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
   }, []);
 
   const players = useMemo(() => {
-    const incomingPlayers = Array.isArray(gameData?.players) ? gameData.players : [];
-
-    const normalize = (list) =>
-      list.map((player, idx) => ({
+    const gamePlayers = gameData.players ?? [];
+    if (gamePlayers.length) {
+      const playersData = gamePlayers.map((player, idx) => ({
         id: player.name ?? `p_${idx}`,
         name: player.name ?? `Player ${idx + 1}`,
         score: player.score ?? 0,
         bids: player.bids ?? 0,
         wins: player.wins ?? 0,
-        isYou: playerName ? player.name === playerName : idx === 0,
       }));
 
-    if (incomingPlayers.length) {
-      const normalized = normalize(incomingPlayers);
-
-      if (!normalized.some((p) => p.isYou) && normalized.length) {
-        normalized[0].isYou = true;
-      }
-
-      const youIndex = normalized.findIndex((p) => p.isYou);
-
-      if (youIndex > 0) {
-        return [...normalized.slice(youIndex), ...normalized.slice(0, youIndex)];
-      }
-
-      return normalized;
+      return playersData;
     }
 
-    return [
-      { id: 'p1', name: playerName || 'You', score: 42, bids: 4, wins: 3, isYou: true },
-      { id: 'p2', name: 'Player 2', score: 38, bids: 3, wins: 2, isYou: false },
-      { id: 'p3', name: 'Player 3', score: 55, bids: 5, wins: 5, isYou: false },
-      { id: 'p4', name: 'Player 4', score: 47, bids: 2, wins: 2, isYou: false },
-    ];
-  }, [gameData, playerName]);
+    return [];
+  }, [gameData.players]);
 
-  const roomCode = String(gameData?.code ?? '------').toUpperCase();
-
-  const yourHand = useMemo(
-    () => [
-      { value: 'A', type: 'spade' },
-      { value: 'K', type: 'spade' },
-      { value: 'Q', type: 'spade' },
-      { value: 'J', type: 'spade' },
-      { value: '10', type: 'spade' },
-      { value: '9', type: 'heart' },
-      { value: '8', type: 'heart' },
-      { value: '7', type: 'diamond' },
-      { value: '6', type: 'diamond' },
-      { value: '5', type: 'club' },
-      { value: '4', type: 'club' },
-      { value: '3', type: 'club' },
-      { value: '2', type: 'club' },
-    ],
-    []
+  const playerHand = useMemo(
+    () => gameData.players.find((playerData) => playerData?.name === playerName)?.cards ?? [],
+    [gameData.players, playerName]
   );
 
   const playedCards = useMemo(() => {
@@ -259,7 +208,7 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
       { value: '9', type: 'spade' },
       { value: 'A', type: 'heart' },
       { value: 'K', type: 'diamond' },
-      { value: 'Q', type: 'club' },
+      { value: 'SJ', type: 'joker' },
     ];
 
     return players.reduce((acc, player, idx) => {
@@ -268,10 +217,9 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
     }, {});
   }, [players]);
 
-  const statusText = useMemo(() => {
-    const waitingFor = players.find((p) => !p.isYou)?.name ?? players[0]?.name ?? 'Player';
-    return `Waiting for ${waitingFor}`;
-  }, [players]);
+  const statusText = useMemo(() => gameData.statusText, [gameData.statusText]);
+
+  const roomCode = String(gameData.code ?? '------');
 
   return (
     <div className="min-h-screen text-white relative overflow-hidden">
@@ -297,7 +245,7 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <ActionButton onClick={() => setIsScorecardOpen(true)} className="h-12">
+            <ActionButton onClick={() => setOpenScoreCardModal(true)} className="h-12">
               <BarChart3 size={18} className="text-cyan-300" />
               <span className="hidden sm:inline text-sm">Stats</span>
             </ActionButton>
@@ -355,7 +303,7 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
                           <p className="text-[10px] text-cyan-300/80 font-black uppercase tracking-[0.35em]">
                             Game Status
                           </p>
-                          <p className="mt-1 text-base font-semibold tracking-wider whitespace-nowrap text-cyan-200 bg-clip-text">
+                          <p className="mt-1 text-base font-semibold tracking-widest whitespace-nowrap text-cyan-200 bg-clip-text">
                             {statusText}
                           </p>
                         </div>
@@ -372,12 +320,13 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
                     totalSeats={players.length}
                     seatIndex={idx}
                     playedCard={playedCards[player.id]}
+                    isPlayerTurn={gameData.currentPlayer === player.name}
                   />
                 ))}
               </div>
             </div>
             <Border />
-            <div className="mt-6">
+            <div className="mt-6 mb-2">
               <div className="flex items-end justify-between gap-4 px-2">
                 <div>
                   <h2 className="text-lg sm:text-xl lg:text-2xl font-black tracking-tight">
@@ -392,7 +341,7 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
                     Cards
                   </span>
                   <span className="text-sm font-black text-cyan-300 tabular-nums">
-                    {yourHand.length}
+                    {playerHand.length}
                   </span>
                 </div>
               </div>
@@ -401,7 +350,7 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
                   sm:rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.5)]"
               >
                 <div className="flex flex-wrap justify-center gap-3.5 pt-2 pb-2">
-                  {yourHand.map((card, idx) => (
+                  {playerHand.map((card, idx) => (
                     <button key={`${card.value}_${card.type}_${idx}`}>
                       <PlayingCard
                         card={card}
@@ -416,16 +365,22 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
           </div>
         </main>
       </div>
-      {isScorecardOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+      {openScorecardModal && (
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 sm:p-6 overflow-y-auto">
           <button
-            onClick={() => setIsScorecardOpen(false)}
+            onClick={() => setOpenScoreCardModal(false)}
             className="absolute inset-0 bg-[#020617]/80 backdrop-blur-md"
             aria-label="Close scorecard"
           />
-          <div className="w-full max-w-xl relative z-10 bg-slate-900/40 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] shadow-[0_30px_120px_rgba(0,0,0,0.65)] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div
+            className="w-full max-w-xl relative z-10 bg-slate-900/40 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] shadow-[0_30px_120px_rgba(0,0,0,0.65)]
+              overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3rem)]"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Scorecard"
+          >
             <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.12)_0%,transparent_55%)]" />
-            <div className="relative z-10 p-6 sm:p-8">
+            <div className="relative z-10 p-6 sm:p-8 flex flex-col h-full min-h-0">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">
@@ -436,7 +391,7 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
                   </h3>
                 </div>
                 <button
-                  onClick={() => setIsScorecardOpen(false)}
+                  onClick={() => setOpenScoreCardModal(false)}
                   className="w-11 h-11 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center active:scale-95
                     transition-all"
                   aria-label="Close modal"
@@ -444,10 +399,9 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
                   <X className="text-slate-300" size={18} />
                 </button>
               </div>
-              <div className="mt-7 space-y-2">
+              <div className="mt-7 space-y-2 flex-1 min-h-0 overflow-y-auto pr-1 sm:pr-2">
                 {players
-                  .slice()
-                  .sort((p1, p2) => (p2.score ?? 0) - (p1.score ?? 0))
+                  .sort((player1, player2) => (player2.score ?? 0) - (player1.score ?? 0))
                   .map((player, idx) => (
                     <div
                       key={idx}
@@ -487,6 +441,133 @@ export const GameArenaPage = ({ gameData, playerName, onLeave }) => {
                       </div>
                     </div>
                   ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {gameData.roundStatus === BIDDING && gameData.currentPlayer === playerName && (
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div className="absolute inset-0 bg-[#020617]/80 backdrop-blur-md" />
+          <div
+            className="w-full max-w-5xl relative z-10 bg-slate-900/40 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] shadow-[0_30px_120px_rgba(0,0,0,0.65)]
+              overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3rem)]"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Place your bid"
+          >
+            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.14)_0%,transparent_55%)]" />
+            <div className="relative z-10 p-6 sm:p-8 flex flex-col h-full min-h-0">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">
+                    {gameData.gameType}
+                  </p>
+                  <h3 className="text-2xl sm:text-3xl font-black tracking-tight mt-1 truncate">
+                    Enter Your Bid
+                  </h3>
+                </div>
+              </div>
+              <div className="mt-7 grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8 flex-1 min-h-0">
+                <div className="lg:col-span-2">
+                  <div className="p-5 sm:p-6 rounded-4xl bg-slate-950/35 border border-white/5 backdrop-blur-xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.35em]">
+                      Number of bids
+                    </p>
+                    <div className="mt-4">
+                      <label className="sr-only" htmlFor="bidCount">
+                        Enter number of bids
+                      </label>
+                      <input
+                        id="bidCount"
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        max={playerHand.length}
+                        placeholder="0"
+                        className="w-full h-14 px-4 rounded-2xl bg-slate-950/60 border border-white/10 text-white font-black text-lg tracking-tight
+                          focus:outline-none focus:ring-2 focus:ring-cyan-500/35 focus:border-cyan-500/30 transition
+                          [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em]">
+                          Max {playerHand.length}
+                        </p>
+                        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em]">
+                          {gameData.variant}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-5 rounded-2xl border border-white/5 bg-white/5 px-4 py-3">
+                      <p className="text-xs text-slate-300/80 font-black leading-relaxed">
+                        Bid how many tricks you expect to win this round.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled
+                      className="mt-5 w-full h-12 rounded-2xl bg-linear-to-r from-cyan-500/30 to-blue-600/30 border border-cyan-500/20
+                        text-white/70 font-black tracking-tight flex items-center justify-center gap-2 cursor-not-allowed"
+                    >
+                      Confirm Bid
+                    </button>
+                  </div>
+                </div>
+                <div className="lg:col-span-3 flex flex-col min-h-0">
+                  <div className="flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.35em]">
+                        Your Hand
+                      </p>
+                      <h4 className="mt-1 text-lg sm:text-xl font-black tracking-tight">
+                        All Cards Available
+                      </h4>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950/60 border border-white/10 backdrop-blur-xl">
+                      <span className="text-[9px] text-slate-500 font-black uppercase tracking-[0.3em]">
+                        Cards
+                      </span>
+                      <span className="text-sm font-black text-cyan-300 tabular-nums">
+                        {playerHand.length}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex-1 min-h-0 rounded-4xl bg-slate-950/35 border border-white/5 backdrop-blur-xl shadow-[0_20px_70px_rgba(0,0,0,0.45)] overflow-hidden">
+                    <div className="p-4 sm:p-6 h-full min-h-0 overflow-y-auto">
+                      {playerHand.length === 0 ? (
+                        <div className="h-full min-h-40 flex items-center justify-center">
+                          <p className="text-sm text-slate-400 font-black uppercase tracking-[0.3em]">
+                            No cards yet
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-4 gap-3 sm:hidden">
+                            {playerHand.map((card, idx) => (
+                              <div key={idx} className="flex justify-center">
+                                <PlayingCard card={card} size="sm" />
+                              </div>
+                            ))}
+                          </div>
+                          <div className="hidden sm:grid lg:hidden grid-cols-4 gap-4">
+                            {playerHand.map((card, idx) => (
+                              <div key={idx} className="flex justify-center">
+                                <PlayingCard card={card} size="sm" />
+                              </div>
+                            ))}
+                          </div>
+                          <div className="hidden lg:grid grid-cols-6 gap-4">
+                            {playerHand.map((card, idx) => (
+                              <div key={idx} className="flex justify-center">
+                                <PlayingCard card={card} size="md" />
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

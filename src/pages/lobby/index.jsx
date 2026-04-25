@@ -47,9 +47,8 @@ const Button = ({
   );
 };
 
-export const LobbyPage = ({ gameData, playerName, onLeave, onStartGame }) => {
+export const LobbyPage = ({ gameData, playerName, onLeave, onStartGame, onVariantChange }) => {
   const [isCodeCopied, setIsCodeCopied] = useState(false);
-  const [variant, setVariant] = useState('');
 
   const codeCopiedTimeoutRef = useRef(null);
 
@@ -62,6 +61,7 @@ export const LobbyPage = ({ gameData, playerName, onLeave, onStartGame }) => {
   }, []);
 
   const isHost = gameData?.host === playerName;
+  const selectedVariant = gameData?.variant ?? '';
   const gameVariants =
     gameData?.gameType === GAME_TYPE.SPADES
       ? Object.values(SPADES_VARIANT)
@@ -111,6 +111,11 @@ export const LobbyPage = ({ gameData, playerName, onLeave, onStartGame }) => {
     }
   };
 
+  const handleSelectVariant = (gameVariant) => {
+    if (!isHost) return;
+    onVariantChange(gameVariant);
+  };
+
   return (
     <div className="min-h-screen text-white p-6 md:p-12 flex items-center justify-center relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-cyan-500 to-transparent opacity-50" />
@@ -122,7 +127,7 @@ export const LobbyPage = ({ gameData, playerName, onLeave, onStartGame }) => {
                 <Users className="text-cyan-400" size={32} />
                 Waiting Room
               </h2>
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1.5">
                 Synchronizing Players
               </p>
             </div>
@@ -244,16 +249,16 @@ export const LobbyPage = ({ gameData, playerName, onLeave, onStartGame }) => {
                   {gameVariants.map((gameVariant) => (
                     <button
                       key={gameVariant}
-                      onClick={() => setVariant(gameVariant)}
+                      onClick={() => handleSelectVariant(gameVariant)}
                       disabled={!isHost}
                       className={`group flex items-center justify-between p-4 rounded-2xl border transition-all duration-300 ${
-                        variant === gameVariant
+                        selectedVariant === gameVariant
                           ? 'bg-cyan-500 text-white border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)]'
                           : 'bg-slate-950/50 border-white/5 text-slate-500 hover:border-white/20'
                       }`}
                     >
                       <span className="capitalize font-black tracking-wide">{gameVariant}</span>
-                      {variant === gameVariant ? (
+                      {selectedVariant === gameVariant ? (
                         <div className="bg-white/20 p-1 rounded-md">
                           <ShieldCheck size={16} />
                         </div>
@@ -268,7 +273,7 @@ export const LobbyPage = ({ gameData, playerName, onLeave, onStartGame }) => {
             <div className="mt-10 space-y-4">
               {isHost ? (
                 <Button
-                  onClick={() => onStartGame(variant)}
+                  onClick={() => onStartGame(selectedVariant)}
                   className="w-full h-16 text-xl tracking-widest font-black uppercase italic"
                   disabled={gameData.players.length < minPlayers}
                 >
