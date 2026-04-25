@@ -140,7 +140,7 @@ const startGame = async (lobbyId, variant) => {
     [`lobby/${lobbyId}/currentRound`]: currentRound - 1,
     [`lobby/${lobbyId}/variant`]: variant,
     [`lobby/${lobbyId}/remainingCards`]: remainingCards,
-    [`lobby/${lobbyId}/currentPlayer`]: shuffledPlayerNames[0],
+    [`lobby/${lobbyId}/currentPlayerIdx`]: 0,
   };
 
   shuffledPlayerNames.forEach((name, idx) => {

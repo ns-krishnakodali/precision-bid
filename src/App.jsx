@@ -25,7 +25,6 @@ const App = () => {
     if (!trimmedMessage) return;
 
     setToast({
-      id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
       message: trimmedMessage,
       type,
     });

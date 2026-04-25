@@ -14,7 +14,7 @@ export const MAX_ACCUMULATED = 5;
 export const LOBBY_DETAILS = 'LOBBY_DETAILS';
 
 export const BIDDING = 'Bidding';
-export const PLAYING = 'Playing';
+export const IN_PLAY = 'In Play';
 
 // Objects
 export const GAME_STATE = {

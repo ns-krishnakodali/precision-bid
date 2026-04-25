@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { BarChart3, LogOut, X, User } from 'lucide-react';
 
+import { Toaster } from '../../components';
 import { BIDDING, JOKER, SUITE_META } from '../../constants';
+import { gameService } from '../../services';
 
 const getSeatPosition = ({ totalSeats, seatIndex, xRadiusPercent, yRadiusPercent }) => {
   const angle = Math.PI / 2 - (Math.PI * 2 * seatIndex) / totalSeats;
@@ -170,6 +172,8 @@ const GameSeat = ({ player, totalSeats, seatIndex, playedCard, isPlayerTurn }) =
 
 export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
   const [openScorecardModal, setOpenScoreCardModal] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [bidCount, setBidCount] = useState('');
 
   const tableRef = useRef(null);
 
@@ -217,12 +221,38 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
     }, {});
   }, [players]);
 
-  const statusText = useMemo(() => gameData.statusText, [gameData.statusText]);
-
   const roomCode = String(gameData.code ?? '------');
+  const currentPlayer = players[gameData?.currentPlayerIdx ?? 0]?.name;
+  const isBidValid =
+    bidCount !== '' &&
+    Number.isInteger(Number(bidCount)) &&
+    Number(bidCount) >= 0 &&
+    Number(bidCount) <= playerHand.length;
+
+  const handleUserBid = async () => {
+    if (!isBidValid) {
+      setToast({
+        message: `Enter a valid bid between 0 and ${playerHand.length}.`,
+        type: 'error',
+      });
+      return;
+    }
+
+    const currentPlayerIdx = gameData?.currentPlayerIdx;
+
+    await gameService.updateRoundState(lobbyId, playerName, {}, Number(bidCount));
+    await gameService.updatedcurrentPlayerIdx(lobbyId);
+
+    // Include new game status which is SELECT TRUMP SUIT and prompt a modal
+    // Also only perform the below for Bid Whist, no need of Trump for Spades or No Trump variant
+    if (currentPlayerIdx === players.length - 1) {
+      await gameService.updateRoundTrump(lobbyId);
+    }
+  };
 
   return (
     <div className="min-h-screen text-white relative overflow-hidden">
+      <Toaster toast={toast} onDismiss={() => setToast(null)} />
       <div className="absolute top-[-30%] left-[-10%] w-[60%] h-[60%] bg-cyan-500/10 rounded-full blur-[160px]" />
       <div className="absolute bottom-[-35%] right-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[160px]" />
       <div className="absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(#1e293b_1px,transparent_1px)] bg-size-[40px_40px]" />
@@ -304,7 +334,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                             Game Status
                           </p>
                           <p className="mt-1 text-base font-semibold tracking-widest whitespace-nowrap text-cyan-200 bg-clip-text">
-                            {statusText}
+                            {gameData.statusText ?? ''}
                           </p>
                         </div>
                       </div>
@@ -320,7 +350,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                     totalSeats={players.length}
                     seatIndex={idx}
                     playedCard={playedCards[player.id]}
-                    isPlayerTurn={gameData.currentPlayer === player.name}
+                    isPlayerTurn={currentPlayer === player.name}
                   />
                 ))}
               </div>
@@ -446,7 +476,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
           </div>
         </div>
       )}
-      {gameData.roundStatus === BIDDING && gameData.currentPlayer === playerName && (
+      {gameData.roundStatus === BIDDING && currentPlayer === playerName && (
         <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 sm:p-6 overflow-y-auto">
           <div className="absolute inset-0 bg-[#020617]/80 backdrop-blur-md" />
           <div
@@ -482,9 +512,11 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                         id="bidCount"
                         type="number"
                         inputMode="numeric"
+                        value={bidCount}
                         min={0}
                         max={playerHand.length}
                         placeholder="0"
+                        onChange={(event) => setBidCount(event.target.value)}
                         className="w-full h-14 px-4 rounded-2xl bg-slate-950/60 border border-white/10 text-white font-black text-lg tracking-tight
                           focus:outline-none focus:ring-2 focus:ring-cyan-500/35 focus:border-cyan-500/30 transition
                           [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -505,9 +537,13 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                     </div>
                     <button
                       type="button"
-                      disabled
-                      className="mt-5 w-full h-12 rounded-2xl bg-linear-to-r from-cyan-500/30 to-blue-600/30 border border-cyan-500/20
-                        text-white/70 font-black tracking-tight flex items-center justify-center gap-2 cursor-not-allowed"
+                      disabled={!isBidValid}
+                      onClick={handleUserBid}
+                      className={`mt-5 w-full h-12 rounded-2xl border font-black tracking-tight flex items-center justify-center gap-2 transition-all duration-200 ${
+                        isBidValid
+                          ? 'bg-linear-to-r from-cyan-500 to-blue-600 border-transparent text-white hover:shadow-[0_0_22px_rgba(6,182,212,0.35)] active:scale-[0.99]'
+                          : 'bg-linear-to-r from-cyan-500/30 to-blue-600/30 border-cyan-500/20 text-white/70 cursor-not-allowed'
+                      }`}
                     >
                       Confirm Bid
                     </button>

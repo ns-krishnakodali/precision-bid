@@ -22,14 +22,14 @@ const TOAST_TYPES = {
 
 export const Toaster = ({ toast, onDismiss, durationMs = 3500 }) => {
   useEffect(() => {
-    if (!toast?.id) return undefined;
+    if (!toast?.message) return undefined;
 
     const timeoutId = setTimeout(() => {
       onDismiss?.();
     }, durationMs);
 
     return () => clearTimeout(timeoutId);
-  }, [durationMs, onDismiss, toast?.id]);
+  }, [durationMs, onDismiss, toast]);
 
   if (!toast?.message) return null;
 

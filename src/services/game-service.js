@@ -5,6 +5,7 @@ import {
   BIDDING,
   BIG_JOKER,
   CARD_VALUES,
+  IN_PLAY,
   JOKER,
   MAX_ACCUMULATED,
   MAX_ROUNDS,
@@ -43,34 +44,14 @@ const addNewRound = async (lobbyId) => {
   });
 };
 
-const updateRoundTrump = async (lobbyId, trumpType) => {
-  if (!lobbyId) throw new Error('Missing lobbyId.');
-  if (!trumpType) throw new Error('Invalid trump type.');
-
-  await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
-    if (!lobbyData) return lobbyData;
-
-    const currentRound = lobbyData.rounds[lobbyData.currentRound - 1];
-
-    currentRound.trumpType = String(trumpType);
-    currentRound.currentTurn = 1;
-
-    return lobbyData;
-  });
-};
-
-const updateRoundState = async (lobbyId, playerName, cardDetails, bids) => {
+const updatedcurrentPlayerIdx = async (lobbyId) => {
   if (!lobbyId) throw new Error('Missing lobbyId.');
 
   await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
     if (!lobbyData) return lobbyData;
 
-    const currentRound = lobbyData.rounds[lobbyData.currentRound - 1];
-
-    if (cardDetails && Object.keys(cardDetails).length > 0) {
-      currentRound.players[playerName].played.push(cardDetails);
-    }
-    if (typeof bids !== 'undefined') currentRound.players[playerName].bids = Number(bids);
+    const currentPlayerIdx = lobbyData.currentPlayerIdx;
+    lobbyData.currentPlayerIdx = (currentPlayerIdx + 1) % Object.keys(lobbyData.players).length;
 
     return lobbyData;
   });
@@ -115,6 +96,40 @@ const updateTurnWinner = async (lobbyId) => {
     }
 
     currentRound.players[winnerDetails.playerName].wins += 1;
+
+    return lobbyData;
+  });
+};
+
+const updateRoundTrump = async (lobbyId, trumpType) => {
+  if (!lobbyId) throw new Error('Missing lobbyId.');
+  if (!trumpType) throw new Error('Invalid trump type.');
+
+  await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
+    if (!lobbyData) return lobbyData;
+
+    const currentRound = lobbyData.rounds[lobbyData.currentRound - 1];
+    currentRound.trumpType = String(trumpType);
+    currentRound.currentTurn = 1;
+
+    lobbyData.roundStatus = IN_PLAY;
+
+    return lobbyData;
+  });
+};
+
+const updateRoundState = async (lobbyId, playerName, cardDetails, bids) => {
+  if (!lobbyId) throw new Error('Missing lobbyId.');
+
+  await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
+    if (!lobbyData) return lobbyData;
+
+    const currentRound = lobbyData.rounds[lobbyData.currentRound - 1];
+
+    if (cardDetails && Object.keys(cardDetails).length > 0) {
+      currentRound.players[playerName].played.push(cardDetails);
+    }
+    if (typeof bids !== 'undefined') currentRound.players[playerName].bids = Number(bids);
 
     return lobbyData;
   });
@@ -174,8 +189,9 @@ const updateRoundWinnner = async (lobbyId) => {
 
 export const gameService = {
   addNewRound,
+  updatedcurrentPlayerIdx,
+  updateTurnWinner,
   updateRoundTrump,
   updateRoundState,
-  updateTurnWinner,
   updateRoundWinnner,
 };
