@@ -15,6 +15,7 @@ export const LOBBY_DETAILS = 'LOBBY_DETAILS';
 
 export const BIDDING = 'Bidding';
 export const IN_PLAY = 'In Play';
+export const SELECT_TRUMP = 'Select Trump Suit';
 
 // Objects
 export const GAME_STATE = {
@@ -75,7 +76,7 @@ export const SUITE_META = {
 
 // Arrays
 export const CARD_VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-export const CARD_TYPES = ['spade', 'heart', 'diamond', 'club'];
+export const CARD_SUITS = ['spade', 'heart', 'diamond', 'club'];
 
 export const LOADING_MESSAGES = [
   'Shuffling cards and preparing the deck',

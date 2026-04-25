@@ -9,9 +9,25 @@ import {
   JOKER,
   MAX_ACCUMULATED,
   MAX_ROUNDS,
+  SELECT_TRUMP,
   SMALL_JOKER,
 } from '../constants';
 import { db } from '../firebase';
+
+const getBidWinner = (currentRound) => {
+  let bidWinner = '';
+  let highestBid = 0;
+
+  for (const [playerName, playerDetails] of Object.entries(currentRound.players)) {
+    const playerBid = Number(playerDetails.bids ?? 0);
+    if (!bidWinner || playerBid > highestBid) {
+      bidWinner = playerName;
+      highestBid = playerBid;
+    }
+  }
+
+  return bidWinner;
+};
 
 const addNewRound = async (lobbyId) => {
   if (!lobbyId) throw new Error('Missing lobbyId.');
@@ -32,26 +48,26 @@ const addNewRound = async (lobbyId) => {
     const nextRound = {
       players: roundPlayers,
       currentTurn: 0,
-      trumpType: '',
+      trumpSuit: '',
     };
 
     if (!lobbyData.rounds || !Array.isArray(lobbyData.rounds)) lobbyData.rounds = [];
     lobbyData.rounds.push(nextRound);
-    lobbyData.currentRound += 1;
+    lobbyData.roundNumber += 1;
     lobbyData.roundStatus = BIDDING;
 
     return lobbyData;
   });
 };
 
-const updatedcurrentPlayerIdx = async (lobbyId) => {
+const updateCurrentPlayerIdx = async (lobbyId) => {
   if (!lobbyId) throw new Error('Missing lobbyId.');
 
   await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
     if (!lobbyData) return lobbyData;
 
-    const currentPlayerIdx = lobbyData.currentPlayerIdx;
-    lobbyData.currentPlayerIdx = (currentPlayerIdx + 1) % Object.keys(lobbyData.players).length;
+    lobbyData.currentPlayerIdx =
+      (lobbyData.currentPlayerIdx + 1) % Object.keys(lobbyData.players).length;
 
     return lobbyData;
   });
@@ -64,9 +80,9 @@ const updateTurnWinner = async (lobbyId) => {
     if (!lobbyData) return lobbyData;
 
     const valueLowCard = lobbyData.variant === BID_WHIST_VARIANT.DOWNTOWN;
-    const currentRound = lobbyData.rounds[lobbyData.currentRound - 1];
+    const currentRound = lobbyData.rounds.at(-1);
     const currentTurn = currentRound.currentTurn - 1;
-    const trumpType = currentRound.trumpType;
+    const trumpSuit = currentRound.trumpSuit;
 
     let winnerDetails = null;
     for (let [playerName, playerDetails] of Object.entries(currentRound.players)) {
@@ -77,59 +93,80 @@ const updateTurnWinner = async (lobbyId) => {
 
       const cardWins =
         !winnerDetails ||
-        (cardDetails.type === trumpType && winnerDetails.type !== trumpType) ||
-        (cardDetails.type === winnerDetails.type &&
+        (cardDetails.suit === trumpSuit && winnerDetails.suit !== trumpSuit) ||
+        (cardDetails.suit === winnerDetails.suit &&
           ((valueLowCard && cardDetails.value < winnerDetails.value) ||
             (!valueLowCard && cardDetails.value > winnerDetails.value)));
 
       if (cardWins) {
         winnerDetails = {
           playerName,
-          type: cardDetails.type,
           value: cardDetails.value,
+          suit: cardDetails.suit,
         };
       }
     }
 
-    if (winnerDetails === null) {
-      return lobbyData;
+    if (winnerDetails) {
+      currentRound.players[winnerDetails.playerName].wins += 1;
     }
-
-    currentRound.players[winnerDetails.playerName].wins += 1;
+    currentRound.startPlayerIdx =
+      (currentRound.startPlayerIdx + 1) % Object.keys(lobbyData.players).length;
+    lobbyData.currentPlayerIdx = currentRound.startPlayerIdx;
 
     return lobbyData;
   });
 };
 
-const updateRoundTrump = async (lobbyId, trumpType) => {
+const updateRoundTrump = async (lobbyId, trumpSuit) => {
   if (!lobbyId) throw new Error('Missing lobbyId.');
-  if (!trumpType) throw new Error('Invalid trump type.');
 
   await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
     if (!lobbyData) return lobbyData;
 
-    const currentRound = lobbyData.rounds[lobbyData.currentRound - 1];
-    currentRound.trumpType = String(trumpType);
-    currentRound.currentTurn = 1;
+    const currentRound = lobbyData.rounds.at(-1);
+    const bidWinner = getBidWinner(currentRound);
 
+    currentRound.startPlayerIdx = Number(lobbyData.players[bidWinner].order) - 1;
+
+    lobbyData.currentPlayerIdx = currentRound.startPlayerIdx;
+
+    if (trumpSuit === undefined) {
+      lobbyData.roundStatus = SELECT_TRUMP;
+      return lobbyData;
+    }
+
+    if (trumpSuit === null) throw new Error('Invalid trump suit.');
+
+    currentRound.trumpSuit = String(trumpSuit);
+    currentRound.currentTurn = 1;
     lobbyData.roundStatus = IN_PLAY;
 
     return lobbyData;
   });
 };
 
-const updateRoundState = async (lobbyId, playerName, cardDetails, bids) => {
+const updateRoundState = async (
+  lobbyId,
+  playerName,
+  cardDetails,
+  bids,
+  updatePlayerPosition = false
+) => {
   if (!lobbyId) throw new Error('Missing lobbyId.');
 
   await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
     if (!lobbyData) return lobbyData;
 
-    const currentRound = lobbyData.rounds[lobbyData.currentRound - 1];
-
+    const currentRound = lobbyData.rounds.at(-1);
     if (cardDetails && Object.keys(cardDetails).length > 0) {
       currentRound.players[playerName].played.push(cardDetails);
     }
     if (typeof bids !== 'undefined') currentRound.players[playerName].bids = Number(bids);
+    if (updatePlayerPosition) {
+      lobbyData.currentPlayerIdx =
+        (lobbyData.currentPlayerIdx + 1) % Object.keys(lobbyData.players).length;
+    }
 
     return lobbyData;
   });
@@ -141,7 +178,7 @@ const updateRoundWinnner = async (lobbyId) => {
   await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
     if (!lobbyData) return lobbyData;
 
-    const currentRound = lobbyData.rounds[lobbyData.currentRound - 1];
+    const currentRound = lobbyData.rounds.at(-1);
 
     for (let [playerName, playerDetails] of Object.entries(currentRound.players)) {
       if (typeof playerDetails.wins === 'undefined' || typeof playerDetails.bids === 'undefined') {
@@ -170,7 +207,7 @@ const updateRoundWinnner = async (lobbyId) => {
       lobbyData.players[playerName].accumulated += totalAccumulated;
     }
 
-    if (lobbyData.currentRound < MAX_ROUNDS) {
+    if (lobbyData.roundNumber < MAX_ROUNDS) {
       addNewRound(lobbyId);
     } else {
       let winnerName = '';
@@ -189,7 +226,7 @@ const updateRoundWinnner = async (lobbyId) => {
 
 export const gameService = {
   addNewRound,
-  updatedcurrentPlayerIdx,
+  updateCurrentPlayerIdx,
   updateTurnWinner,
   updateRoundTrump,
   updateRoundState,

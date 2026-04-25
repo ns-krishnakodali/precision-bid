@@ -1,10 +1,10 @@
-import { BIG_JOKER, CARD_TYPES, CARD_VALUES, JOKER, SMALL_JOKER } from '../constants';
+import { BIG_JOKER, CARD_SUITS, CARD_VALUES, JOKER, SMALL_JOKER } from '../constants';
 
 const buildDeck = (includeJokers) => {
-  const deck = CARD_TYPES.flatMap((type) => CARD_VALUES.map((value) => ({ value, type })));
+  const deck = CARD_SUITS.flatMap((suit) => CARD_VALUES.map((value) => ({ value, suit })));
 
   if (includeJokers) {
-    deck.push({ value: BIG_JOKER, type: JOKER }, { value: SMALL_JOKER, type: JOKER });
+    deck.push({ value: BIG_JOKER, suit: JOKER }, { value: SMALL_JOKER, suit: JOKER });
   }
 
   return deck;
@@ -23,7 +23,7 @@ const shuffleDeck = (cards) => {
 
 const getCardRank = (card) => {
   const maxRank = CARD_VALUES.length;
-  if (card.type === JOKER) {
+  if (card.suit === JOKER) {
     return card.value === BIG_JOKER ? maxRank + 1 : maxRank;
   }
 
@@ -42,7 +42,7 @@ export const dealCards = (numPlayers, includeJokers = false) => {
   const players = Array.from({ length: playersCount }, (_, playerIdx) => {
     const hand = shuffledDeck.slice(playerIdx * cardsPerPlayer, (playerIdx + 1) * cardsPerPlayer);
     return hand.sort((card1, card2) => {
-      return getCardRank(card2) - getCardRank(card1) || card1.type.localeCompare(card2.type);
+      return getCardRank(card2) - getCardRank(card1) || card1.suit.localeCompare(card2.suit);
     });
   });
 

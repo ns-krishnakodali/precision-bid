@@ -113,8 +113,8 @@ const startGame = async (lobbyId, variant) => {
 
   if (!playerNames.length) throw new Error('No players found in lobby.');
 
-  const currentRound = GAME_ROUNDS[variant];
-  if (!currentRound) {
+  const roundNumber = GAME_ROUNDS[variant];
+  if (!roundNumber) {
     throw new Error('Invalid variant. Please select a valid game variant before starting.');
   }
 
@@ -137,7 +137,7 @@ const startGame = async (lobbyId, variant) => {
 
   const updates = {
     [`lobby/${lobbyId}/status`]: LOBBY_STATUS.IN_GAME,
-    [`lobby/${lobbyId}/currentRound`]: currentRound - 1,
+    [`lobby/${lobbyId}/roundNumber`]: roundNumber - 1,
     [`lobby/${lobbyId}/variant`]: variant,
     [`lobby/${lobbyId}/remainingCards`]: remainingCards,
     [`lobby/${lobbyId}/currentPlayerIdx`]: 0,

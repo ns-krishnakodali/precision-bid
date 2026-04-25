@@ -3,7 +3,20 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, LogOut, X, User } from 'lucide-react';
 
 import { Toaster } from '../../components';
-import { BIDDING, JOKER, SUITE_META } from '../../constants';
+import {
+  BID_WHIST_VARIANT,
+  BIDDING,
+  CARD_SUITS,
+  CLUB,
+  DIAMOND,
+  GAME_TYPE,
+  HEART,
+  JOKER,
+  SELECT_TRUMP,
+  SPADE,
+  SPADES_VARIANT,
+  SUITE_META,
+} from '../../constants';
 import { gameService } from '../../services';
 
 const getSeatPosition = ({ totalSeats, seatIndex, xRadiusPercent, yRadiusPercent }) => {
@@ -41,7 +54,7 @@ const Border = () => (
 
 const PlayingCard = ({ card, size = 'md', className = '' }) => {
   const value = card?.value ?? '';
-  const suit = String(card?.type ?? '').toLowerCase();
+  const suit = card?.suit ?? '';
   const { symbol, color } = SUITE_META[suit] ?? {};
 
   const sizes = {
@@ -64,8 +77,8 @@ const PlayingCard = ({ card, size = 'md', className = '' }) => {
 
   return (
     <div
-      className={`${sizes[size]} relative bg-linear-to-br from-white to-slate-50 text-slate-900 shadow-[0_16px_35px_rgba(0,0,0,0.5)] border
-        border-white/60${className}`}
+      className={`${sizes[size]} relative bg-linear-to-br from-white to-slate-50 text-slate-900 shadow-[0_16px_35px_rgba(0,0,0,0.5)] border border-white/60
+        animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-200 ${className}`}
     >
       <div className="absolute inset-0 rounded-[inherit] ring-1 ring-black/10 pointer-events-none" />
       <div className={`absolute top-1.5 left-1.5 ${color}`}>
@@ -150,18 +163,33 @@ const GameSeat = ({ player, totalSeats, seatIndex, playedCard, isPlayerTurn }) =
       }}
     >
       <div className="relative flex flex-col items-center gap-1.5 sm:gap-2">
-        {playedCard ? (
-          <div className="relative z-20 -mb-0.5">
-            <div className="absolute inset-x-2 bottom-0 h-3 rounded-full bg-cyan-400/20 blur-md" />
-            <PlayingCard
-              card={playedCard}
-              size="xs"
-              className="relative transition-transform duration-300 hover:-translate-y-1"
-            />
-          </div>
-        ) : (
-          <div className="h-16" />
-        )}
+        <div className="relative z-20 -mb-0.5">
+          {Object.keys(playedCard ?? {}).length > 0 ? (
+            <>
+              <div className="absolute inset-x-2 bottom-0 h-3 rounded-full bg-cyan-400/20 blur-md" />
+              <PlayingCard
+                card={playedCard}
+                size="xs"
+                className="relative transition-transform duration-300 hover:-translate-y-1"
+              />
+            </>
+          ) : (
+            <>
+              <div className="absolute inset-x-2 bottom-0 h-3 rounded-full bg-cyan-400/10 blur-md" />
+              <div
+                className="relative w-11 h-16 rounded-md bg-linear-to-br from-slate-800/80 to-slate-950/90 border border-white/10 backdrop-blur-xl
+                  shadow-[0_16px_35px_rgba(0,0,0,0.35)] overflow-hidden"
+              >
+                <div className="absolute inset-1 rounded-[inherit] border border-cyan-300/20" />
+                <div
+                  className="absolute inset-2 rounded-sm
+                    bg-[repeating-linear-gradient(45deg,rgba(255,255,255,0.08)_0px,rgba(255,255,255,0.08)_1px,transparent_1px,transparent_5px)]"
+                />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.14)_0%,transparent_65%)]" />
+              </div>
+            </>
+          )}
+        </div>
         <div className="relative z-10">
           <PlayerCard player={player} isPlayerTurn={isPlayerTurn} />
         </div>
@@ -171,8 +199,8 @@ const GameSeat = ({ player, totalSeats, seatIndex, playedCard, isPlayerTurn }) =
 };
 
 export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
-  const [openScorecardModal, setOpenScoreCardModal] = useState(false);
   const [toast, setToast] = useState(null);
+  const [openScorecardModal, setOpenScoreCardModal] = useState(false);
   const [bidCount, setBidCount] = useState('');
 
   const tableRef = useRef(null);
@@ -185,42 +213,34 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
     return () => cancelAnimationFrame(frame);
   }, []);
 
-  const players = useMemo(() => {
-    const gamePlayers = gameData.players ?? [];
-    if (gamePlayers.length) {
-      const playersData = gamePlayers.map((player, idx) => ({
-        id: player.name ?? `p_${idx}`,
-        name: player.name ?? `Player ${idx + 1}`,
-        score: player.score ?? 0,
-        bids: player.bids ?? 0,
-        wins: player.wins ?? 0,
-      }));
-
-      return playersData;
-    }
-
-    return [];
-  }, [gameData.players]);
+  const players = useMemo(
+    () =>
+      (gameData.players ?? []).map((player) => ({
+        name: player.name,
+        score: player.score,
+        accumulated: player.accumulated,
+        bids: gameData.rounds?.at(-1).players?.[player.name].bids,
+        wins: gameData.rounds?.at(-1).players?.[player.name].wins,
+      })),
+    [gameData.players, gameData.rounds]
+  );
 
   const playerHand = useMemo(
     () => gameData.players.find((playerData) => playerData?.name === playerName)?.cards ?? [],
     [gameData.players, playerName]
   );
 
-  const playedCards = useMemo(() => {
-    const samples = [
-      { value: '9', type: 'spade' },
-      { value: 'A', type: 'heart' },
-      { value: 'K', type: 'diamond' },
-      { value: 'SJ', type: 'joker' },
-    ];
+  const playedCards = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(gameData.rounds?.at(-1)?.players ?? {}).map(
+          ([playerName, playerDetails]) => [playerName, playerDetails.played?.at?.(-1) ?? {}]
+        )
+      ),
+    [gameData.rounds]
+  );
 
-    return players.reduce((acc, player, idx) => {
-      acc[player.id] = samples[idx % samples.length];
-      return acc;
-    }, {});
-  }, [players]);
-
+  // Variables
   const roomCode = String(gameData.code ?? '------');
   const currentPlayer = players[gameData?.currentPlayerIdx ?? 0]?.name;
   const isBidValid =
@@ -229,6 +249,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
     Number(bidCount) >= 0 &&
     Number(bidCount) <= playerHand.length;
 
+  // Handler methods
   const handleUserBid = async () => {
     if (!isBidValid) {
       setToast({
@@ -238,16 +259,20 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
       return;
     }
 
-    const currentPlayerIdx = gameData?.currentPlayerIdx;
+    const isLastBidder = gameData?.currentPlayerIdx === players.length - 1;
 
-    await gameService.updateRoundState(lobbyId, playerName, {}, Number(bidCount));
-    await gameService.updatedcurrentPlayerIdx(lobbyId);
+    await gameService.updateRoundState(lobbyId, playerName, {}, Number(bidCount), !isLastBidder);
 
-    // Include new game status which is SELECT TRUMP SUIT and prompt a modal
-    // Also only perform the below for Bid Whist, no need of Trump for Spades or No Trump variant
-    if (currentPlayerIdx === players.length - 1) {
-      await gameService.updateRoundTrump(lobbyId);
-    }
+    if (isLastBidder)
+      await gameService.updateRoundTrump(
+        lobbyId,
+        gameData.variant === BID_WHIST_VARIANT.UPTOWN ||
+          gameData.variant === BID_WHIST_VARIANT.DOWNTOWN
+          ? undefined
+          : gameData.gameType === GAME_TYPE.SPADES
+            ? SPADE
+            : ''
+      );
   };
 
   return (
@@ -349,7 +374,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                     player={player}
                     totalSeats={players.length}
                     seatIndex={idx}
-                    playedCard={playedCards[player.id]}
+                    playedCard={playedCards[player.name]}
                     isPlayerTurn={currentPlayer === player.name}
                   />
                 ))}
@@ -381,7 +406,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
               >
                 <div className="flex flex-wrap justify-center gap-3.5 pt-2 pb-2">
                   {playerHand.map((card, idx) => (
-                    <button key={`${card.value}_${card.type}_${idx}`}>
+                    <button key={idx}>
                       <PlayingCard
                         card={card}
                         size="md"
@@ -487,12 +512,9 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
             aria-label="Place your bid"
           >
             <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.14)_0%,transparent_55%)]" />
-            <div className="relative z-10 p-6 sm:p-8 flex flex-col h-full min-h-0">
-              <div className="flex items-start justify-between gap-4">
+            <div className="relative z-10 px-6 py-5 flex flex-col h-full min-h-0">
+              <div className="flex items-center justify-between px-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">
-                    {gameData.gameType}
-                  </p>
                   <h3 className="text-2xl sm:text-3xl font-black tracking-tight mt-1 truncate">
                     Enter Your Bid
                   </h3>
@@ -525,9 +547,6 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                         <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em]">
                           Max {playerHand.length}
                         </p>
-                        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em]">
-                          {gameData.variant}
-                        </p>
                       </div>
                     </div>
                     <div className="mt-5 rounded-2xl border border-white/5 bg-white/5 px-4 py-3">
@@ -547,6 +566,14 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                     >
                       Confirm Bid
                     </button>
+                  </div>
+                  <div className="mt-6 flex flex-wrap items-center justify-center gap-6">
+                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-cyan-200">
+                      {gameData.gameType}
+                    </span>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-slate-300">
+                      {gameData.variant}
+                    </span>
                   </div>
                 </div>
                 <div className="lg:col-span-3 flex flex-col min-h-0">
@@ -604,6 +631,78 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {gameData.roundStatus === SELECT_TRUMP && currentPlayer === playerName && (
+        <div className="fixed inset-0 z-60 flex items-start sm:items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div className="absolute inset-0 bg-[#020617]/80 backdrop-blur-md" />
+          <div
+            className="w-full max-w-xl relative z-10 bg-slate-900/40 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] shadow-[0_30px_120px_rgba(0,0,0,0.65)]
+              overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Choose trump suit"
+          >
+            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.12)_0%,transparent_55%)]" />
+            <div className="relative z-10 p-6 sm:p-8">
+              <div className="flex items-start justify-center gap-4">
+                <div className="min-w-0">
+                  <h3 className="text-2xl sm:text-3xl font-black tracking-tight mt-1 truncate">
+                    Choose a Trump Suit
+                  </h3>
+                  <p className="mt-3 text-sm text-slate-300/80 font-black leading-relaxed tracking-wide">
+                    Pick the suit that will dominate this round.
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center justify-center gap-4">
+                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-cyan-200">
+                      {gameData.gameType}
+                    </span>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-slate-300">
+                      {gameData.variant}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                {CARD_SUITS.map((suit, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className="group relative rounded-3xl border border-white/10 bg-slate-950/40 backdrop-blur-xl px-5 py-5 shadow-[0_18px_55px_rgba(0,0,0,0.45)]
+                      transition-all duration-200 hover:bg-white/5 hover:border-white/15 active:scale-[0.99] text-left"
+                  >
+                    <div className="absolute inset-0 rounded-[inherit] ring-1 ring-black/10 pointer-events-none" />
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.35em]">
+                          Suit
+                        </p>
+                        <p className="mt-1 text-lg sm:text-xl font-black tracking-tight text-white capitalize">
+                          {suit}
+                        </p>
+                      </div>
+                      <div
+                        className={`w-12 h-12 rounded-2xl border flex items-center justify-center ${
+                          suit === HEART || suit === DIAMOND
+                            ? 'bg-rose-500/10 border-rose-500/20'
+                            : 'bg-slate-200/5 border-white/10'
+                        }`}
+                      >
+                        <span
+                          className={`text-3xl font-black leading-none ${SUITE_META[suit]?.color ?? ''}`}
+                        >
+                          {SUITE_META[suit]?.symbol ?? ''}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-4 h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+                      <div className="h-full w-0 group-hover:w-full transition-all duration-300 bg-linear-to-r from-cyan-500/60 to-blue-600/60" />
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
