@@ -10,7 +10,7 @@ import {
   MAX_ATTEMPTS,
 } from '../constants';
 import { db } from '../firebase';
-import { dealCards, generateUniqueCode } from '../utils';
+import { generateUniqueCode } from '../utils';
 import { gameService } from './game-service';
 
 const getLobbyIdByCode = async (gameCode) => {
@@ -127,25 +127,15 @@ const startGame = async (lobbyId, variant) => {
     ];
   }
 
-  const includeJokers =
-    lobbyData?.gameType === GAME_TYPE.BID_WHIST && variant !== BID_WHIST_VARIANT.NO_TRUMP;
-
-  const { players: dealtHands, remainingCards } = dealCards(
-    shuffledPlayerNames.length,
-    includeJokers
-  );
-
   const updates = {
     [`lobby/${lobbyId}/status`]: LOBBY_STATUS.IN_GAME,
     [`lobby/${lobbyId}/roundNumber`]: roundNumber - 1,
     [`lobby/${lobbyId}/variant`]: variant,
-    [`lobby/${lobbyId}/remainingCards`]: remainingCards,
     [`lobby/${lobbyId}/currentPlayerIdx`]: 0,
   };
 
   shuffledPlayerNames.forEach((name, idx) => {
-    updates[`lobby/${lobbyId}/players/${name}/cards`] = dealtHands[idx] ?? [];
-    updates[`lobby/${lobbyId}/players/${name}/order`] = idx + 1;
+    updates[`lobby/${lobbyId}/players/${name}/orderIdx`] = idx;
     updates[`lobby/${lobbyId}/players/${name}/score`] = 0;
     updates[`lobby/${lobbyId}/players/${name}/accumulated`] = 0;
   });

@@ -47,7 +47,7 @@ const App = () => {
         }
 
         const players = Object.values(data.players ?? {}).sort((p1, p2) => {
-          if (p1?.order != null && p2?.order != null) return p1.order - p2.order;
+          if (p1?.orderIdx != null && p2?.orderIdx != null) return p1.orderIdx - p2.orderIdx;
           if (p1.isHost && !p2.isHost) return -1;
           if (!p1.isHost && p2.isHost) return 1;
           return p1.joinedAt - p2.joinedAt;

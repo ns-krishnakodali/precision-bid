@@ -13,6 +13,7 @@ import {
   ShieldUser,
   Blocks,
   Bolt,
+  Bot,
 } from 'lucide-react';
 
 import { BID_WHIST_VARIANT, GAME_CONFIG, GAME_TYPE, SPADES_VARIANT } from '../../constants';
@@ -270,16 +271,26 @@ export const LobbyPage = ({ gameData, playerName, onLeave, onStartGame, onVarian
                 </div>
               </div>
             </div>
-            <div className="mt-10 space-y-4">
+            <div className="mt-8 space-y-4">
               {isHost ? (
-                <Button
-                  onClick={() => onStartGame(selectedVariant)}
-                  className="w-full h-16 text-xl tracking-widest font-black uppercase italic"
-                  disabled={gameData.players.length < minPlayers}
-                >
-                  START GAME{' '}
-                  <ChevronRight className="group-hover:translate-x-1 transition-transform" />
-                </Button>
+                <>
+                  <Button variant="secondary" className="w-full h-14" disabled>
+                    <Bot size={20} className="shrink-0 mr-1" />
+                    <span className="text-sm tracking-[0.32em] font-black uppercase">Add Bot</span>
+                  </Button>
+                  <Button
+                    className="w-full h-16"
+                    disabled={gameData.players.length < minPlayers}
+                    onClick={() => onStartGame(selectedVariant)}
+                  >
+                    <span className="inline-flex items-center gap-2 leading-none">
+                      <span className="font-black uppercase text-xl tracking-widest">
+                        START GAME
+                      </span>
+                      <ChevronRight className="shrink-0 translate-y-px group-hover:translate-x-1 transition-transform" />
+                    </span>
+                  </Button>
+                </>
               ) : (
                 <div className="flex flex-col items-center gap-4 text-center p-6 rounded-4xl bg-cyan-500/5 border border-cyan-500/10">
                   <div className="flex gap-1">

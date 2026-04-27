@@ -60,7 +60,7 @@ const PlayingCard = ({ card, size = 'md', className = '' }) => {
   const sizes = {
     xs: 'w-11 h-16 rounded-md',
     sm: 'w-13 h-19 rounded-lg',
-    md: 'w-20 h-28 rounded-xl',
+    md: 'w-20 h-30 rounded-xl',
   };
 
   const cornerTextSize = {
@@ -234,7 +234,10 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
     () =>
       Object.fromEntries(
         Object.entries(gameData.rounds?.at(-1)?.players ?? {}).map(
-          ([playerName, playerDetails]) => [playerName, playerDetails.played?.at?.(-1) ?? {}]
+          ([playerName, playerDetails]) => [
+            playerName,
+            playerDetails.played?.[Number(gameData.rounds?.at(-1)?.currentTurn ?? 1) - 1] ?? {},
+          ]
         )
       ),
     [gameData.rounds]
@@ -243,6 +246,16 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
   // Variables
   const roomCode = String(gameData.code ?? '------');
   const currentPlayer = players[gameData?.currentPlayerIdx ?? 0]?.name;
+  const isPlayerTurn = currentPlayer === playerName;
+  const currentRound = gameData.rounds?.at(-1);
+  const leadSuit =
+    Number(currentRound?.currentTurn ?? 0) - 1 >= 0
+      ? (currentRound.players?.[players[currentRound?.startPlayerIdx ?? -1]?.name]?.played?.[
+          Number(currentRound?.currentTurn ?? 0) - 1
+        ]?.suit ?? '')
+      : '';
+  const restrictedSuit =
+    leadSuit && playerHand.some((cardDetails) => cardDetails.suit === leadSuit) ? leadSuit : '';
   const isBidValid =
     bidCount !== '' &&
     Number.isInteger(Number(bidCount)) &&
@@ -262,7 +275,6 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
     const isLastBidder = gameData?.currentPlayerIdx === players.length - 1;
 
     await gameService.updateRoundState(lobbyId, playerName, {}, Number(bidCount), !isLastBidder);
-
     if (isLastBidder)
       await gameService.updateRoundTrump(
         lobbyId,
@@ -273,6 +285,24 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
             ? SPADE
             : ''
       );
+  };
+
+  const handleCardPlay = async (cardDetails) => {
+    if (Object.keys(cardDetails ?? {}).length === 0) {
+      setToast({
+        message: 'Invalid card details',
+        type: 'error',
+      });
+      return;
+    }
+
+    const currentPlayerIdx = gameData?.currentPlayerIdx;
+
+    await gameService.updateRoundState(lobbyId, playerName, cardDetails, undefined, true);
+
+    if ((currentPlayerIdx + 1) % players.length === gameData.rounds?.at(-1)?.startPlayerIdx) {
+      await gameService.updateTurnWinner(lobbyId);
+    }
   };
 
   return (
@@ -335,18 +365,18 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                 </div>
               </div>
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-                <div className="relative">
+                <div className="relative w-55">
                   <div className="absolute -inset-2 rounded-full bg-cyan-500/20 blur-xl animate-pulse" />
                   <div className="relative rounded-full p-0.5 overflow-hidden">
                     <div
                       className="absolute inset-[-50%] animate-spin"
                       style={{
-                        animationDuration: '4s',
+                        animationDuration: '4.2s',
                         background:
                           'conic-gradient(from 0deg, transparent 0%, rgb(6 182 212) 25%, transparent 50%, rgb(59 130 246) 75%, transparent 100%)',
                       }}
                     />
-                    <div className="relative px-5 sm:px-7 py-3 sm:py-4 rounded-full bg-slate-950/90 backdrop-blur-xl text-center overflow-hidden">
+                    <div className="relative px-5 py-3 sm:py-4 rounded-full bg-slate-950/90 backdrop-blur-xl text-center overflow-hidden">
                       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.22)_0%,transparent_65%)]" />
                       <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-400/60 to-transparent" />
                       <div className="relative z-10 flex items-center gap-2.5 sm:gap-3">
@@ -356,10 +386,10 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                         </span>
                         <div className="text-left leading-tight">
                           <p className="text-[10px] text-cyan-300/80 font-black uppercase tracking-[0.35em]">
-                            Game Status
+                            {gameData.roundStatus}
                           </p>
-                          <p className="mt-1 text-base font-semibold tracking-widest whitespace-nowrap text-cyan-200 bg-clip-text">
-                            {gameData.statusText ?? ''}
+                          <p className="mt-1 text-sm font-semibold tracking-wider whitespace-nowrap text-cyan-200 bg-clip-text">
+                            {gameData.statusText || `Waiting for ${currentPlayer}`}
                           </p>
                         </div>
                       </div>
@@ -401,20 +431,45 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                 </div>
               </div>
               <div
-                className="mt-3 sm:mt-4 px-3 sm:px-5 lg:px-6 pt-5 sm:pt-6 pb-3 sm:pb-4 bg-slate-900/40 backdrop-blur-3xl border border-white/5 rounded-[1.75rem]
-                  sm:rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.5)]"
+                className="mt-3 sm:mt-4 px-3 sm:px-5 lg:px-6 py-4 min-h-40 sm:min-h-42 bg-slate-900/40 backdrop-blur-3xl border border-white/5 rounded-[1.75rem]
+                  sm:rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.5)] flex justify-center"
               >
-                <div className="flex flex-wrap justify-center gap-3.5 pt-2 pb-2">
-                  {playerHand.map((card, idx) => (
-                    <button key={idx}>
-                      <PlayingCard
-                        card={card}
-                        size="md"
-                        className="transition-transform duration-300 hover:-translate-y-1"
-                      />
-                    </button>
-                  ))}
-                </div>
+                {playerHand.length === 0 ? (
+                  <div className="min-h-28 flex items-center justify-center text-center px-4">
+                    <div>
+                      <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.35em]">
+                        Hand Empty
+                      </p>
+                      <p className="mt-2 text-sm sm:text-base font-black tracking-normal text-slate-200/90">
+                        You are done with this round
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap justify-center gap-3.5 pt-2 pb-2">
+                    {playerHand.map((cardDetails, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        disabled={
+                          !isPlayerTurn ||
+                          (restrictedSuit !== '' && cardDetails.suit !== restrictedSuit)
+                        }
+                        onClick={() => handleCardPlay(cardDetails)}
+                        className="rounded-xl transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70
+                          focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ring-2 ring-cyan-400/35 shadow-[0_16px_35px_rgba(0,0,0,0.25)]
+                          enabled:hover:-translate-y-1 enabled:active:scale-[0.99] enabled:hover:ring-cyan-300/75 enabled:hover:shadow-[0_0_28px_rgba(6,182,212,0.18)]
+                          disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale disabled:saturate-50 disabled:ring-0 disabled:shadow-none"
+                      >
+                        <PlayingCard
+                          card={cardDetails}
+                          size="md"
+                          className="transition-transform duration-200"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -501,7 +556,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
           </div>
         </div>
       )}
-      {gameData.roundStatus === BIDDING && currentPlayer === playerName && (
+      {gameData.roundStatus === BIDDING && isPlayerTurn && (
         <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 sm:p-6 overflow-y-auto">
           <div className="absolute inset-0 bg-[#020617]/80 backdrop-blur-md" />
           <div
@@ -636,7 +691,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
           </div>
         </div>
       )}
-      {gameData.roundStatus === SELECT_TRUMP && currentPlayer === playerName && (
+      {gameData.roundStatus === SELECT_TRUMP && isPlayerTurn && (
         <div className="fixed inset-0 z-60 flex items-start sm:items-center justify-center p-4 sm:p-6 overflow-y-auto">
           <div className="absolute inset-0 bg-[#020617]/80 backdrop-blur-md" />
           <div

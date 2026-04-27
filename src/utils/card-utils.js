@@ -30,24 +30,31 @@ const getCardRank = (card) => {
   return CARD_VALUES.indexOf(card.value);
 };
 
-export const dealCards = (numPlayers, includeJokers = false) => {
+export const dealCards = (numPlayers, cardsPerPlayer = 13, includeJokers = false) => {
   const playersCount = Number(numPlayers);
   if (!Number.isInteger(playersCount) || playersCount < 1) {
     throw new Error('numPlayers must be a positive integer.');
   }
 
-  const shuffledDeck = shuffleDeck(buildDeck(includeJokers));
-  const cardsPerPlayer = Math.floor(shuffledDeck.length / playersCount);
+  const cardsCount = Number(cardsPerPlayer);
+  if (!Number.isInteger(cardsCount) || cardsCount < 1) {
+    throw new Error('cardsPerPlayer must be a positive integer.');
+  }
 
-  const players = Array.from({ length: playersCount }, (_, playerIdx) => {
-    const hand = shuffledDeck.slice(playerIdx * cardsPerPlayer, (playerIdx + 1) * cardsPerPlayer);
+  const shuffledDeck = shuffleDeck(buildDeck(includeJokers));
+  if (playersCount * cardsCount > shuffledDeck.length) {
+    throw new Error('Not enough cards to deal.');
+  }
+
+  const dealtCards = Array.from({ length: playersCount }, (_, playerIdx) => {
+    const hand = shuffledDeck.slice(playerIdx * cardsCount, (playerIdx + 1) * cardsCount);
     return hand.sort((card1, card2) => {
       return getCardRank(card2) - getCardRank(card1) || card1.suit.localeCompare(card2.suit);
     });
   });
 
   return {
-    players,
-    remainingCards: shuffledDeck.slice(playersCount * cardsPerPlayer),
+    dealtCards,
+    remainingCards: shuffledDeck.slice(playersCount * cardsCount),
   };
 };

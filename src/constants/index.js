@@ -14,8 +14,11 @@ export const MAX_ACCUMULATED = 5;
 export const LOBBY_DETAILS = 'LOBBY_DETAILS';
 
 export const BIDDING = 'Bidding';
-export const IN_PLAY = 'In Play';
-export const SELECT_TRUMP = 'Select Trump Suit';
+export const GAME_STATUS = 'Game Status';
+export const NEW_ROUND_STATUS = 'New Round';
+export const SELECT_TRUMP = 'Selecting Trump Suit';
+
+export const ROUND_START_STATUS = 'Starting a new round';
 
 // Objects
 export const GAME_STATE = {
@@ -59,11 +62,11 @@ export const GAME_CONFIG = {
 };
 
 export const GAME_ROUNDS = {
-  [SPADES_VARIANT.CLASSIC]: 12,
-  [SPADES_VARIANT.OH_HELL]: 0,
-  [BID_WHIST_VARIANT.UPTOWN]: 0,
-  [BID_WHIST_VARIANT.DOWNTOWN]: 0,
-  [BID_WHIST_VARIANT.NO_TRUMP]: 12,
+  [SPADES_VARIANT.CLASSIC]: 13,
+  [SPADES_VARIANT.OH_HELL]: 1,
+  [BID_WHIST_VARIANT.UPTOWN]: 1,
+  [BID_WHIST_VARIANT.DOWNTOWN]: 1,
+  [BID_WHIST_VARIANT.NO_TRUMP]: 13,
 };
 
 export const SUITE_META = {
@@ -72,6 +75,22 @@ export const SUITE_META = {
   [CLUB]: { symbol: '\u2663', color: 'text-slate-800' },
   [SPADE]: { symbol: '\u2660', color: 'text-slate-800' },
   [JOKER]: { symbol: '\u2605', color: 'text-violet-600' },
+};
+
+export const CARDS_ORDER = {
+  2: 1,
+  3: 2,
+  4: 3,
+  5: 4,
+  6: 5,
+  7: 6,
+  8: 7,
+  9: 8,
+  10: 9,
+  J: 10,
+  Q: 11,
+  K: 12,
+  A: 13,
 };
 
 // Arrays

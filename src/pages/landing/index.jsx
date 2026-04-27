@@ -85,7 +85,7 @@ export const LandingPage = ({ onCreateGame, onJoinGame }) => {
             <div className="relative">
               <h1 className="text-5xl font-black tracking-tighter text-white flex items-center gap-3">
                 PRECISION
-                <span className="text-transparent bg-clip-text bg-linear-to-r from-cyan-400 to-blue-500">
+                <span className="text-transparent bg-clip-text bg-linear-to-r from-cyan-400 to-blue-500 pr-1">
                   BID
                 </span>
               </h1>
