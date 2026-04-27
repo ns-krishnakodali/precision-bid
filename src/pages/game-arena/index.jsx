@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { BarChart3, LogOut, X, User } from 'lucide-react';
+import { BarChart3, Crown, LogOut, User, X } from 'lucide-react';
 
 import { Toaster } from '../../components';
 import {
@@ -476,7 +476,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
         </main>
       </div>
       {openScorecardModal && (
-        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-90 flex items-start sm:items-center justify-center p-4 sm:p-6 overflow-y-auto">
           <button
             onClick={() => setOpenScoreCardModal(false)}
             className="absolute inset-0 bg-[#020617]/80 backdrop-blur-md"
@@ -758,6 +758,86 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                     </div>
                   </button>
                 ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {gameData.winnerName && (
+        <div className="fixed inset-0 z-70 grid place-items-center p-4 sm:p-6">
+          <div
+            className="absolute inset-0 bg-[#020617]/85 backdrop-blur-lg"
+            aria-label="Close winner"
+          />
+          <div
+            className="relative z-10 w-full max-w-xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-4xl sm:rounded-[2.5rem] border border-white/10 bg-slate-950/80 shadow-[0_30px_120px_rgba(0,0,0,0.7)] animate-in fade-in zoom-in-95 duration-200"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Winner"
+          >
+            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.18)_0%,transparent_55%)]" />
+            <button
+              onClick={onLeave}
+              className="absolute right-5 top-5 z-20 w-11 h-11 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center
+                active:scale-95 transition-all"
+              aria-label="Close modal"
+            >
+              <X className="text-slate-300 font-bold" size={18} />
+            </button>
+            <div className="relative z-10 px-6 py-8 sm:px-8 sm:py-10 text-center">
+              <div
+                className="mx-auto w-20 h-20 rounded-[1.75rem] border border-cyan-500/25 bg-cyan-500/10 flex items-center justify-center
+              shadow-[0_20px_60px_rgba(6,182,212,0.18)]"
+              >
+                <Crown className="text-cyan-200" size={30} />
+              </div>
+              <p className="mt-6 text-xs font-black text-slate-500 uppercase tracking-[0.35em]">
+                Game Over
+              </p>
+              <h3 className="mt-2 text-3xl sm:text-4xl font-black tracking-tight">
+                {gameData.winnerName === playerName ? 'You Won!' : 'Winner'}
+              </h3>
+              <div className="relative mt-7 rounded-4xl bg-white/4 border border-white/10 backdrop-blur-xl p-6 overflow-hidden">
+                <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-400/40 to-transparent" />
+                <p className="text-3xl sm:text-4xl font-black tracking-tight truncate">
+                  {gameData.winnerName}
+                </p>
+                <div className="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/45 px-4 py-2">
+                    <span className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">
+                      Final Score
+                    </span>
+                    <span className="text-sm font-black text-white tabular-nums">
+                      {players.find((player) => player.name === gameData.winnerName).score}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-center text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">
+                      {gameData.gameType}
+                    </span>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-center text-[10px] font-black uppercase tracking-[0.22em] text-slate-300">
+                      {gameData.variant}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                <ActionButton variant="primary" onClick={onLeave} className="h-12">
+                  Continue
+                </ActionButton>
+                <ActionButton
+                  onClick={() => {
+                    setOpenScoreCardModal(true);
+                  }}
+                  className="h-12"
+                >
+                  <BarChart3 size={18} className="text-cyan-300" />
+                  View Stats
+                </ActionButton>
+                <ActionButton onClick={onLeave} variant="danger" className="h-12">
+                  <LogOut size={18} />
+                  Leave Game
+                </ActionButton>
               </div>
             </div>
           </div>

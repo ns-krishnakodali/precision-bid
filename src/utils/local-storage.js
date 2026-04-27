@@ -47,8 +47,8 @@ export const getStorageValue = (key, defaultValue = null) => {
 
     try {
       localStorage.setItem(key, decodedValue);
-    } catch {
-      // ignore localStorage failures
+    } catch (err) {
+      console.error('Failed to set decoded item', err);
     }
 
     return parsedValue;
