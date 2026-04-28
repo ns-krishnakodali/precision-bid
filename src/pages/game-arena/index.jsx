@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { BarChart3, Crown, LogOut, User, X } from 'lucide-react';
+import { BarChart3, Crown, LogOut, Star, User, X } from 'lucide-react';
 
 import { Toaster } from '../../components';
 import {
@@ -96,7 +96,7 @@ const PlayingCard = ({ card, size = 'md', className = '' }) => {
   );
 };
 
-const PlayerCard = ({ player, isPlayerTurn = false }) => {
+const PlayerCard = ({ player, isPlayerTurn = false, isTurnStarter = false }) => {
   const bids = player.bids ?? 0;
   const wins = player.wins ?? 0;
   const met = bids > 0 && wins >= bids;
@@ -109,6 +109,16 @@ const PlayerCard = ({ player, isPlayerTurn = false }) => {
           : 'bg-slate-950/80 border-white/15'
       }`}
     >
+      {isTurnStarter && (
+        <div
+          className="absolute right-2 top-1.6 flex h-5 w-5 items-center justify-center rounded-full border border-cyan-400/25 bg-slate-950/85
+            shadow-[0_0_12px_rgba(6,182,212,0.2)] sm:h-4.5 sm:w-4.5"
+          title="Started this turn"
+        >
+          <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_top,rgba(103,232,249,0.22)_0%,transparent_70%)]" />
+          <Star size={9} className="relative text-cyan-200 sm:h-2.5 sm:w-2.5" />
+        </div>
+      )}
       <div className="w-full flex items-center justify-center gap-1.5 min-w-0">
         <span
           className={`w-1.5 h-1.5 rounded-full shrink-0 ${
@@ -145,7 +155,7 @@ const PlayerCard = ({ player, isPlayerTurn = false }) => {
   );
 };
 
-const GameSeat = ({ player, totalSeats, seatIndex, playedCard, isPlayerTurn }) => {
+const GameSeat = ({ player, totalSeats, seatIndex, playedCard, isPlayerTurn, isTurnStarter }) => {
   const playersPosition = getSeatPosition({
     totalSeats,
     seatIndex,
@@ -191,7 +201,7 @@ const GameSeat = ({ player, totalSeats, seatIndex, playedCard, isPlayerTurn }) =
           )}
         </div>
         <div className="relative z-10">
-          <PlayerCard player={player} isPlayerTurn={isPlayerTurn} />
+          <PlayerCard player={player} isPlayerTurn={isPlayerTurn} isTurnStarter={isTurnStarter} />
         </div>
       </div>
     </div>
@@ -207,11 +217,13 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
-      tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (!gameData?.winnerName) {
+        tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     });
 
     return () => cancelAnimationFrame(frame);
-  }, []);
+  }, [gameData?.winnerName]);
 
   const players = useMemo(
     () =>
@@ -244,7 +256,6 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
   );
 
   // Variables
-  const roomCode = String(gameData.code ?? '------');
   const currentPlayer = players[gameData?.currentPlayerIdx ?? 0]?.name;
   const isPlayerTurn = currentPlayer === playerName;
   const currentRound = gameData.rounds?.at(-1);
@@ -325,7 +336,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                 Room Code
               </p>
               <p className="text-2xl font-mono font-black text-transparent bg-clip-text bg-linear-to-r from-cyan-300 to-blue-400 leading-none truncate">
-                {roomCode}
+                {String(gameData.code ?? '------')}
               </p>
             </div>
           </div>
@@ -365,7 +376,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                 </div>
               </div>
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-                <div className="relative w-55">
+                <div className="relative w-52">
                   <div className="absolute -inset-2 rounded-full bg-cyan-500/20 blur-xl animate-pulse" />
                   <div className="relative rounded-full p-0.5 overflow-hidden">
                     <div
@@ -388,7 +399,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                           <p className="text-[10px] text-cyan-300/80 font-black uppercase tracking-[0.35em]">
                             {gameData.roundStatus}
                           </p>
-                          <p className="mt-1 text-sm font-semibold tracking-wider whitespace-nowrap text-cyan-200 bg-clip-text">
+                          <p className="mt-1 block max-w-34 truncate text-sm font-semibold tracking-wider text-cyan-200 bg-clip-text sm:max-w-38">
                             {gameData.statusText || `Waiting for ${currentPlayer}`}
                           </p>
                         </div>
@@ -406,6 +417,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                     seatIndex={idx}
                     playedCard={playedCards[player.name]}
                     isPlayerTurn={currentPlayer === player.name}
+                    isTurnStarter={currentRound?.startPlayerIdx === idx}
                   />
                 ))}
               </div>
@@ -764,32 +776,75 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
         </div>
       )}
       {gameData.winnerName && (
-        <div className="fixed inset-0 z-70 grid place-items-center p-4 sm:p-6">
+        <div className="fixed inset-0 z-70 grid place-items-center overflow-hidden p-4 sm:p-6">
           <div
-            className="absolute inset-0 bg-[#020617]/85 backdrop-blur-lg"
+            className="absolute inset-0 bg-[#020617]/85 backdrop-blur-xl"
             aria-label="Close winner"
           />
           <div
-            className="relative z-10 w-full max-w-xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-4xl sm:rounded-[2.5rem] border border-white/10 bg-slate-950/80 shadow-[0_30px_120px_rgba(0,0,0,0.7)] animate-in fade-in zoom-in-95 duration-200"
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 motion-reduce:hidden"
+          >
+            <div className="absolute left-1/2 top-1/2 h-128 w-lg -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-400/10 blur-3xl motion-safe:animate-pulse" />
+            {[
+              'left-[8%] top-[14%] h-2 w-2 rounded-full bg-cyan-300/70 motion-safe:animate-ping',
+              'left-[14%] top-[38%] h-1.5 w-7 rounded-full bg-white/30 motion-safe:animate-[spin_5s_linear_infinite]',
+              'left-[18%] top-[72%] h-2 w-2 rounded-full bg-cyan-200/60 motion-safe:animate-ping',
+              'left-[28%] top-[18%] h-1.5 w-6 rounded-full bg-cyan-300/30 motion-safe:animate-[spin_6s_linear_infinite]',
+              'left-[36%] bottom-[10%] h-1.5 w-1.5 rounded-full bg-white/50 motion-safe:animate-ping',
+              'left-[46%] top-[8%] h-2 w-2 rounded-full bg-cyan-100/60 motion-safe:animate-ping',
+              'right-[8%] top-[18%] h-2 w-2 rounded-full bg-cyan-200/70 motion-safe:animate-ping',
+              'right-[14%] top-[44%] h-1.5 w-8 rounded-full bg-cyan-300/30 motion-safe:animate-[spin_5.5s_linear_infinite]',
+              'right-[18%] bottom-[16%] h-2 w-2 rounded-full bg-white/45 motion-safe:animate-ping',
+              'right-[28%] top-[12%] h-1.5 w-7 rounded-full bg-white/25 motion-safe:animate-[spin_6.5s_linear_infinite]',
+              'right-[38%] bottom-[9%] h-1.5 w-1.5 rounded-full bg-cyan-200/50 motion-safe:animate-ping',
+              'right-[46%] top-[20%] h-2 w-2 rounded-full bg-cyan-300/50 motion-safe:animate-ping',
+              'left-[10%] bottom-[24%] h-1.5 w-6 rounded-full bg-cyan-100/25 motion-safe:animate-[spin_7s_linear_infinite]',
+              'right-[10%] bottom-[34%] h-1.5 w-6 rounded-full bg-white/25 motion-safe:animate-[spin_7.5s_linear_infinite]',
+            ].map((className, index) => (
+              <span
+                key={index}
+                className={`absolute ${className} shadow-[0_0_18px_rgba(103,232,249,0.35)]`}
+                style={{
+                  animationDelay: `${index * 140}ms`,
+                  animationDuration: index % 2 === 0 ? '2.8s' : undefined,
+                }}
+              />
+            ))}
+          </div>
+          <div
+            className="relative z-10 w-full max-w-xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-4xl sm:rounded-[2.5rem] border border-white/10 bg-slate-950/80
+              shadow-[0_30px_120px_rgba(0,0,0,0.7)] animate-in fade-in zoom-in-95 duration-200"
             role="dialog"
             aria-modal="true"
             aria-label="Winner"
           >
-            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.18)_0%,transparent_55%)]" />
+            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.18)_0%,transparent_55%)] motion-safe:animate-pulse" />
             <button
               onClick={onLeave}
               className="absolute right-5 top-5 z-20 w-11 h-11 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center
-                active:scale-95 transition-all"
+          active:scale-95 transition-all"
               aria-label="Close modal"
             >
               <X className="text-slate-300 font-bold" size={18} />
             </button>
             <div className="relative z-10 px-6 py-8 sm:px-8 sm:py-10 text-center">
               <div
-                className="mx-auto w-20 h-20 rounded-[1.75rem] border border-cyan-500/25 bg-cyan-500/10 flex items-center justify-center
-              shadow-[0_20px_60px_rgba(6,182,212,0.18)]"
+                className="relative mx-auto w-20 h-20 rounded-[1.75rem] border border-cyan-500/25 bg-cyan-500/10 flex items-center justify-center
+            shadow-[0_20px_60px_rgba(6,182,212,0.18)]"
               >
-                <Crown className="text-cyan-200" size={30} />
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0 rounded-[1.75rem] border border-cyan-300/30 motion-safe:animate-ping motion-reduce:hidden"
+                />
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-[-0.35rem] rounded-4xl bg-cyan-400/10 blur-xl motion-safe:animate-pulse motion-reduce:hidden"
+                />
+                <Crown
+                  className="relative text-cyan-200 drop-shadow-[0_0_18px_rgba(103,232,249,0.65)] motion-safe:animate-pulse"
+                  size={30}
+                />
               </div>
               <p className="mt-6 text-xs font-black text-slate-500 uppercase tracking-[0.35em]">
                 Game Over
@@ -798,11 +853,15 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                 {gameData.winnerName === playerName ? 'You Won!' : 'Winner'}
               </h3>
               <div className="relative mt-7 rounded-4xl bg-white/4 border border-white/10 backdrop-blur-xl p-6 overflow-hidden">
-                <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-400/40 to-transparent" />
-                <p className="text-3xl sm:text-4xl font-black tracking-tight truncate">
+                <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-400/40 to-transparent motion-safe:animate-pulse" />
+                <div
+                  aria-hidden="true"
+                  className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-cyan-400/10 blur-2xl motion-safe:animate-pulse motion-reduce:hidden"
+                />
+                <p className="relative text-3xl sm:text-4xl font-black tracking-tight truncate">
                   {gameData.winnerName}
                 </p>
-                <div className="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <div className="relative mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
                   <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/45 px-4 py-2">
                     <span className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">
                       Final Score
@@ -812,10 +871,16 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                     </span>
                   </div>
                   <div className="flex flex-wrap justify-center gap-2">
-                    <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-center text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">
+                    <span
+                      className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-center text-[10px] font-black uppercase tracking-[0.22em]
+                      text-cyan-200"
+                    >
                       {gameData.gameType}
                     </span>
-                    <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-center text-[10px] font-black uppercase tracking-[0.22em] text-slate-300">
+                    <span
+                      className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-center text-[10px] font-black uppercase tracking-[0.22em]
+                      text-slate-300"
+                    >
                       {gameData.variant}
                     </span>
                   </div>

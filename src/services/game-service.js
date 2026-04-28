@@ -43,6 +43,9 @@ const addNewRound = async (lobbyId) => {
   await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
     if (!lobbyData) return lobbyData;
 
+    lobbyData.roundStatus = NEW_ROUND_STATUS;
+    lobbyData.statusText = ROUND_START_STATUS;
+
     const playersNames = Object.keys(lobbyData.players ?? {}).sort(
       (playerName1, playerName2) =>
         Number(lobbyData.players[playerName1].orderIdx) -
@@ -100,6 +103,7 @@ const updateTurnWinner = async (lobbyId) => {
   if (!lobbyId) throw new Error('Missing lobbyId.');
 
   let startNewRound = false;
+  let roundNumber = null;
 
   await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
     if (!lobbyData) return lobbyData;
@@ -145,25 +149,28 @@ const updateTurnWinner = async (lobbyId) => {
       }
     }
 
+    roundNumber = lobbyData?.roundNumber;
+    startNewRound = currentRound.currentTurn === roundNumber;
+
+    if (startNewRound && roundNumber < MAX_ROUNDS) {
+      lobbyData.roundStatus = NEW_ROUND_STATUS;
+      lobbyData.statusText = ROUND_START_STATUS;
+    }
+
     if (winnerDetails) {
       currentRound.players[winnerDetails.playerName].wins += 1;
       currentRound.startPlayerIdx = Number(lobbyData.players[winnerDetails.playerName].orderIdx);
     }
-
-    startNewRound = currentRound.currentTurn === lobbyData?.roundNumber;
-
     currentRound.currentTurn += 1;
     lobbyData.currentPlayerIdx = currentRound.startPlayerIdx;
-    if (startNewRound) {
-      lobbyData.roundStatus = NEW_ROUND_STATUS;
-      lobbyData.statusText = ROUND_START_STATUS;
-    }
 
     return lobbyData;
   });
 
   if (startNewRound) {
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    if ((roundNumber ?? MAX_ROUNDS) < MAX_ROUNDS) {
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    }
     await updateRoundWinnner(lobbyId);
   }
 };
@@ -268,7 +275,6 @@ const updateRoundWinnner = async (lobbyId) => {
         totalAccumulated %= MAX_ACCUMULATED;
       }
 
-      lobbyData.statusText = '';
       lobbyData.players[playerName].score += score;
       lobbyData.players[playerName].accumulated += totalAccumulated;
     }
@@ -287,7 +293,7 @@ const updateRoundWinnner = async (lobbyId) => {
     return lobbyData;
   });
 
-  if (roundNumber !== null && roundNumber < MAX_ROUNDS) {
+  if ((roundNumber ?? MAX_ROUNDS) < MAX_ROUNDS) {
     await addNewRound(lobbyId);
   }
 };
