@@ -12,12 +12,15 @@ export const MAX_ATTEMPTS = 10;
 export const MAX_ROUNDS = 13;
 export const MAX_ORDER = 14;
 export const MAX_ACCUMULATED = 5;
+export const POINTS = 10;
 
 export const BIDDING = 'Bidding';
 export const GAME_STATUS = 'Game Status';
 export const NEW_ROUND_STATUS = 'New Round';
+export const NEW_TURN_STATUS = 'New Turn';
 export const SELECT_TRUMP_STATUS = 'Selecting Suit';
-export const ROUND_START_STATUS = 'Starting a new round';
+export const TURN_START_MESSAGE = 'Next trick starting';
+export const ROUND_START_MESSAGE = 'Starting a new round';
 
 export const LOBBY_DETAILS = 'LOBBY_DETAILS';
 
@@ -37,7 +40,7 @@ export const LOBBY_STATUS = {
 
 export const GAME_TYPE = {
   SPADES: 'Spades',
-  BID_WHIST: 'BidWhist',
+  BID_WHIST: 'Bid Whist',
 };
 
 export const SPADES_VARIANT = {

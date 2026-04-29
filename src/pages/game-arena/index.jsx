@@ -12,6 +12,7 @@ import {
   GAME_TYPE,
   HEART,
   JOKER,
+  POINTS,
   SELECT_TRUMP_STATUS,
   SPADE,
   SPADES_VARIANT,
@@ -107,7 +108,7 @@ const PlayerCard = ({ player, isPlayerTurn = false, isTurnStarter = false }) => 
         isPlayerTurn
           ? 'bg-cyan-500/20 border-cyan-400/50 shadow-[0_0_22px_rgba(6,182,212,0.35)]'
           : 'bg-slate-950/80 border-white/15'
-      }`}
+      } transition-[background-color,border-color,box-shadow,color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]`}
     >
       {isTurnStarter && (
         <div
@@ -123,12 +124,12 @@ const PlayerCard = ({ player, isPlayerTurn = false, isTurnStarter = false }) => 
         <span
           className={`w-1.5 h-1.5 rounded-full shrink-0 ${
             isPlayerTurn ? 'bg-cyan-300 shadow-[0_0_8px_rgba(103,232,249,0.9)]' : 'bg-slate-500'
-          }`}
+          } transition-[background-color,box-shadow] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]`}
         />
         <p
           className={`text-xs sm:text-sm font-black tracking-tight truncate ${
             isPlayerTurn ? 'text-cyan-100' : 'text-white'
-          }`}
+          } transition-colors duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]`}
           title={player.name}
         >
           {player.name}
@@ -139,13 +140,12 @@ const PlayerCard = ({ player, isPlayerTurn = false, isTurnStarter = false }) => 
           <p className="text-[7px] text-slate-400 font-black uppercase tracking-[0.18em]">Bid</p>
           <p className="mt-0.5 text-xs sm:text-sm font-black text-white tabular-nums">{bids}</p>
         </div>
-
         <div className="rounded-lg bg-white/5 border border-white/5 px-1.5 py-1 leading-none">
           <p className="text-[7px] text-slate-400 font-black uppercase tracking-[0.18em]">Wins</p>
           <p
             className={`mt-0.5 text-xs sm:text-sm font-black tabular-nums ${
               met ? 'text-emerald-300' : 'text-white'
-            }`}
+            } transition-colors duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]`}
           >
             {wins}
           </p>
@@ -162,6 +162,7 @@ const GameSeat = ({ player, totalSeats, seatIndex, playedCard, isPlayerTurn, isT
     xRadiusPercent: 37,
     yRadiusPercent: 31,
   });
+  const hasPlayedCard = Object.keys(playedCard ?? {}).length > 0;
 
   return (
     <div
@@ -173,18 +174,20 @@ const GameSeat = ({ player, totalSeats, seatIndex, playedCard, isPlayerTurn, isT
       }}
     >
       <div className="relative flex flex-col items-center gap-1.5 sm:gap-2">
-        <div className="relative z-20 -mb-0.5">
-          {Object.keys(playedCard ?? {}).length > 0 ? (
-            <>
+        <div className="relative z-20 -mb-0.5 perspective-[900px]">
+          <div
+            className={`relative w-11 h-16 transform-3d transition-transform duration-450
+              ease-[cubic-bezier(0.22,1,0.36,1)] ${hasPlayedCard ? 'transform-[rotateX(0deg)]' : 'transform-[rotateX(180deg)]'}`}
+          >
+            <div className="absolute inset-0 backface-hidden">
               <div className="absolute inset-x-2 bottom-0 h-3 rounded-full bg-cyan-400/20 blur-md" />
               <PlayingCard
                 card={playedCard}
                 size="xs"
                 className="relative transition-transform duration-300 hover:-translate-y-1"
               />
-            </>
-          ) : (
-            <>
+            </div>
+            <div className="absolute inset-0 transform-[rotateX(180deg)] backface-hidden">
               <div className="absolute inset-x-2 bottom-0 h-3 rounded-full bg-cyan-400/10 blur-md" />
               <div
                 className="relative w-11 h-16 rounded-md bg-linear-to-br from-slate-800/80 to-slate-950/90 border border-white/10 backdrop-blur-xl
@@ -197,8 +200,8 @@ const GameSeat = ({ player, totalSeats, seatIndex, playedCard, isPlayerTurn, isT
                 />
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.14)_0%,transparent_65%)]" />
               </div>
-            </>
-          )}
+            </div>
+          </div>
         </div>
         <div className="relative z-10">
           <PlayerCard player={player} isPlayerTurn={isPlayerTurn} isTurnStarter={isTurnStarter} />
@@ -211,6 +214,7 @@ const GameSeat = ({ player, totalSeats, seatIndex, playedCard, isPlayerTurn, isT
 export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
   const [toast, setToast] = useState(null);
   const [openScorecardModal, setOpenScoreCardModal] = useState(false);
+  const [scoreHistoryPlayerName, setScoreHistoryPlayerName] = useState('');
   const [bidCount, setBidCount] = useState('');
 
   const tableRef = useRef(null);
@@ -262,7 +266,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
       [...players].sort(
         (player1, player2) =>
           (player2.score ?? 0) - (player1.score ?? 0) ||
-          (player2.accumulated ?? 0) - (player1.accumulated ?? 0)
+          (player1.accumulated ?? 0) - (player2.accumulated ?? 0)
       ),
     [players]
   );
@@ -472,7 +476,10 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                           <span className="absolute inline-flex h-2 w-2 rounded-full bg-cyan-400 opacity-75 animate-ping" />
                           <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.9)]" />
                         </span>
-                        <div className="text-left leading-tight">
+                        <div
+                          key={`${gameData.roundStatus}-${gameData.statusText || `Waiting for ${currentPlayer}`}`}
+                          className="text-left leading-tight motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300"
+                        >
                           <p className="text-[10px] text-cyan-300/80 font-black uppercase tracking-[0.35em]">
                             {gameData.roundStatus}
                           </p>
@@ -573,7 +580,10 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
       {openScorecardModal && (
         <div className="fixed inset-0 z-90 flex items-start justify-center overflow-y-auto p-4 sm:items-center sm:p-6">
           <button
-            onClick={() => setOpenScoreCardModal(false)}
+            onClick={() => {
+              setOpenScoreCardModal(false);
+              setScoreHistoryPlayerName('');
+            }}
             className="absolute inset-0 bg-[#020617]/80 backdrop-blur-md"
             aria-label="Close scorecard"
           />
@@ -599,7 +609,10 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                   className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition-all hover:bg-white/10
                   active:scale-95"
                   aria-label="Close modal"
-                  onClick={() => setOpenScoreCardModal(false)}
+                  onClick={() => {
+                    setOpenScoreCardModal(false);
+                    setScoreHistoryPlayerName('');
+                  }}
                 >
                   <X className="text-slate-300" size={18} />
                 </button>
@@ -669,11 +682,16 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                         </div>
                       </div>
                       <div className="shrink-0 pl-2 text-right">
-                        <p
-                          className={`text-3xl font-black leading-none tabular-nums ${idx === 0 ? 'text-cyan-100' : 'text-white'}`}
+                        <button
+                          type="button"
+                          className={`rounded-xl px-2 py-1 text-3xl font-black leading-none tabular-nums transition-colors hover:bg-white/5 ${
+                            idx === 0 ? 'text-cyan-100' : 'text-white'
+                          }`}
+                          aria-label={`View ${player.name} round history`}
+                          onClick={() => setScoreHistoryPlayerName(player.name)}
                         >
                           {player.score}
-                        </p>
+                        </button>
                         <p className="mt-1 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
                           Points
                         </p>
@@ -684,6 +702,112 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
               </div>
             </div>
           </div>
+          {scoreHistoryPlayerName && (
+            <div className="fixed inset-0 z-100 flex items-start justify-center overflow-y-auto p-4 sm:items-center sm:p-6">
+              <button
+                onClick={() => setScoreHistoryPlayerName('')}
+                className="absolute inset-0 bg-[#020617]/85 backdrop-blur-md"
+                aria-label="Close player history"
+              />
+              <div
+                className="relative z-10 flex max-h-[calc(100dvh-4rem)] w-full max-w-2xl flex-col overflow-hidden rounded-4xl border border-white/10
+                bg-slate-950/80 shadow-[0_30px_120px_rgba(0,0,0,0.75)] backdrop-blur-3xl animate-in fade-in zoom-in-95 duration-200
+                  sm:max-h-[calc(100dvh-5.5rem)] sm:rounded-[2.5rem]"
+                role="dialog"
+                aria-modal="true"
+                aria-label={`${scoreHistoryPlayerName} round history`}
+              >
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.16)_0%,transparent_55%)]" />
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-400/60 to-transparent" />
+                <div className="relative z-10 flex min-h-0 flex-col">
+                  <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-5 sm:px-7 sm:py-6">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-[0.32em] text-cyan-300/70">
+                        Round History
+                      </p>
+                      <h3 className="mt-1 truncate text-2xl font-black tracking-tight text-white sm:text-3xl">
+                        {scoreHistoryPlayerName}
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition-all
+                       hover:bg-white/10 active:scale-95"
+                      aria-label="Close history modal"
+                      onClick={() => setScoreHistoryPlayerName('')}
+                    >
+                      <X className="text-slate-300" size={16} />
+                    </button>
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+                    <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/45">
+                      <div className="grid grid-cols-[1.25fr_0.8fr_0.8fr_1fr] border-b border-white/10 bg-white/3 px-4 py-3">
+                        <p className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-500">
+                          Round
+                        </p>
+                        <p className="text-center text-[9px] font-black uppercase tracking-[0.25em] text-slate-500">
+                          Bids
+                        </p>
+                        <p className="text-center text-[9px] font-black uppercase tracking-[0.25em] text-slate-500">
+                          Wins
+                        </p>
+                        <p className="text-right text-[9px] font-black uppercase tracking-[0.25em] text-slate-500">
+                          Score
+                        </p>
+                      </div>
+                      <div className="divide-y divide-white/8">
+                        {(gameData.rounds ?? []).map((round, roundIdx) => {
+                          const playerRound = round?.players?.[scoreHistoryPlayerName] ?? {};
+                          const bids = playerRound.bids ?? 0;
+                          const wins = playerRound.wins ?? 0;
+                          const isCurrentRound = roundIdx === (gameData.rounds?.length ?? 1) - 1;
+                          const score = !isCurrentRound
+                            ? (wins < bids ? wins - bids : bids) * POINTS
+                            : 0;
+
+                          return (
+                            <div
+                              key={roundIdx}
+                              className="grid grid-cols-[1.25fr_0.8fr_0.8fr_1fr] items-center px-4 py-3 transition-colors hover:bg-white/3"
+                            >
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-black text-white sm:text-base">
+                                    Round {roundIdx + 1}
+                                  </span>
+                                  {isCurrentRound && (
+                                    <span
+                                      className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-[8px] font-black uppercase
+                                        tracking-[0.18em] text-cyan-200"
+                                    >
+                                      Current
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-center text-sm font-black tabular-nums text-slate-100 sm:text-base">
+                                {bids}
+                              </p>
+                              <p className="text-center text-sm font-black tabular-nums text-slate-100 sm:text-base">
+                                {wins}
+                              </p>
+                              <p
+                                className={`text-right text-sm font-black tabular-nums sm:text-base ${
+                                  score >= 0 ? 'text-cyan-200' : 'text-rose-300'
+                                }`}
+                              >
+                                {score > 0 ? `+${score}` : score}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
       {gameData.roundStatus === BIDDING && isPlayerTurn && (

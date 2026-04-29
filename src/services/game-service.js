@@ -12,9 +12,12 @@ import {
   MAX_ORDER,
   MAX_ROUNDS,
   NEW_ROUND_STATUS,
-  ROUND_START_STATUS,
+  NEW_TURN_STATUS,
+  POINTS,
+  ROUND_START_MESSAGE,
   SELECT_TRUMP_STATUS,
   SMALL_JOKER,
+  TURN_START_MESSAGE,
 } from '../constants';
 import { db } from '../firebase';
 import { dealCards } from '../utils';
@@ -161,8 +164,27 @@ const updateRoundTrump = async (lobbyId, trumpSuit) => {
 const updateTurnWinner = async (lobbyId) => {
   if (!lobbyId) throw new Error('Missing lobbyId.');
 
-  let startNewRound = false;
   let roundNumber = null;
+  let startNewRound = false;
+
+  await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
+    roundNumber = lobbyData?.roundNumber;
+    startNewRound = lobbyData.rounds.at(-1)?.currentTurn === roundNumber;
+
+    if (startNewRound && roundNumber < MAX_ROUNDS) {
+      lobbyData.roundStatus = NEW_ROUND_STATUS;
+      lobbyData.statusText = ROUND_START_MESSAGE;
+    } else if (!startNewRound) {
+      lobbyData.roundStatus = NEW_TURN_STATUS;
+      lobbyData.statusText = TURN_START_MESSAGE;
+    }
+
+    return lobbyData;
+  });
+
+  if (!startNewRound || (roundNumber ?? MAX_ROUNDS) < MAX_ROUNDS) {
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+  }
 
   await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
     if (!lobbyData) return lobbyData;
@@ -211,16 +233,6 @@ const updateTurnWinner = async (lobbyId) => {
       }
     }
 
-    roundNumber = lobbyData?.roundNumber;
-    startNewRound = currentRound.currentTurn === roundNumber;
-
-    if (startNewRound && roundNumber < MAX_ROUNDS) {
-      lobbyData.roundStatus = NEW_ROUND_STATUS;
-      lobbyData.statusText = ROUND_START_STATUS;
-    } else {
-      lobbyData.statusText = '';
-    }
-
     if (winnerDetails) {
       currentRound.players[winnerDetails.playerName].wins += 1;
       if (!startNewRound) {
@@ -230,13 +242,15 @@ const updateTurnWinner = async (lobbyId) => {
     }
     currentRound.currentTurn += 1;
 
+    if (!startNewRound) {
+      lobbyData.roundStatus = GAME_STATUS;
+    }
+    lobbyData.statusText = '';
+
     return lobbyData;
   });
 
   if (startNewRound) {
-    if ((roundNumber ?? MAX_ROUNDS) < MAX_ROUNDS) {
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-    }
     await updateRoundWinnner(lobbyId);
   }
 };
@@ -259,18 +273,11 @@ const updateRoundWinnner = async (lobbyId) => {
       const wins = playerDetails.wins;
       const playerObj = lobbyData.players[playerName];
 
-      let score = 0;
-      let accumulated = 0;
-      if (wins < bids) {
-        score = (bids - wins) * -100;
-      } else {
-        score = bids * 100;
-        accumulated = wins - bids;
-      }
+      let score = (wins < bids ? wins - bids : bids) * POINTS;
+      let totalAccumulated = (playerObj?.accumulated ?? 0) + (wins > bids ? wins - bids : 0);
 
-      let totalAccumulated = (playerObj?.accumulated ?? 0) + accumulated;
-      if (totalAccumulated > MAX_ACCUMULATED) {
-        score -= Math.floor(totalAccumulated / MAX_ACCUMULATED) * MAX_ACCUMULATED * 100;
+      if (totalAccumulated >= MAX_ACCUMULATED) {
+        score -= Math.floor(totalAccumulated / MAX_ACCUMULATED) * MAX_ACCUMULATED * POINTS;
         totalAccumulated %= MAX_ACCUMULATED;
       }
 
@@ -282,23 +289,23 @@ const updateRoundWinnner = async (lobbyId) => {
     if (roundNumber >= MAX_ROUNDS) {
       let winnerNames = [];
       let winningScore = Number.NEGATIVE_INFINITY;
-      let winningAccumulated = Number.NEGATIVE_INFINITY;
+      let winningAccumulated = Number.POSITIVE_INFINITY;
 
       for (const [playerName, playerDetails] of Object.entries(lobbyData.players)) {
+        const playerScore = playerDetails.score ?? 0;
+        const playerAccumulated = playerDetails.accumulated ?? 0;
+
         if (
-          playerDetails.score > winningScore ||
-          (playerDetails.score === winningScore && playerDetails.accumulated > winningAccumulated)
+          playerScore > winningScore ||
+          (playerScore === winningScore && playerAccumulated < winningAccumulated)
         ) {
-          winningScore = playerDetails.score;
-          winningAccumulated = playerDetails.accumulated;
+          winningScore = playerScore;
+          winningAccumulated = playerAccumulated;
           winnerNames = [playerName];
           continue;
         }
 
-        if (
-          playerDetails.score === winningScore &&
-          playerDetails.accumulated === winningAccumulated
-        ) {
+        if (playerScore === winningScore && playerAccumulated === winningAccumulated) {
           winnerNames.push(playerName);
         }
       }
