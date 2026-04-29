@@ -1,26 +1,31 @@
 import { useEffect, useRef, useState } from 'react';
 
 import {
+  Blocks,
+  Bolt,
+  Bot,
+  CircleHelp,
   Check,
   ChevronRight,
   Copy,
   LogOut,
   Loader2,
   ShieldCheck,
-  Spade,
-  Users,
-  User,
   ShieldUser,
-  Blocks,
-  Bolt,
-  Bot,
+  Spade,
+  User,
+  Users,
+  X,
 } from 'lucide-react';
 
 import {
   BID_WHIST_VARIANT,
+  CLUB,
   GAME_CONFIG,
   GAME_TYPE,
+  SPADE,
   SPADES_VARIANT,
+  SUITE_META,
   VARIANT_VERSIONS,
 } from '../../constants';
 import { lobbyService } from '../../services';
@@ -64,6 +69,7 @@ export const LobbyPage = ({
   onVariantChange,
 }) => {
   const [isCodeCopied, setIsCodeCopied] = useState(false);
+  const [openGameInfoModal, setOpenGameInfoModal] = useState(false);
 
   const codeCopiedTimeoutRef = useRef(null);
 
@@ -84,6 +90,7 @@ export const LobbyPage = ({
 
   const minPlayers = GAME_CONFIG[gameData.gameType]?.minPlayers;
   const maxPlayers = GAME_CONFIG[gameData.gameType]?.maxPlayers;
+  const isSpadesMode = gameData?.gameType === GAME_TYPE.SPADES;
 
   const showCodeCopied = () => {
     setIsCodeCopied(true);
@@ -141,7 +148,7 @@ export const LobbyPage = ({
   };
 
   return (
-    <div className="min-h-screen text-white p-6 md:p-12 flex items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen text-white p-6 md:p-8 flex items-center justify-center relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-cyan-500 to-transparent opacity-50" />
       <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-12 gap-8 items-start relative z-10">
         <div className="md:col-span-7 space-y-4 md:space-y-6">
@@ -245,24 +252,35 @@ export const LobbyPage = ({
                 <p className="text-[10px] font-black text-cyan-500/80 uppercase tracking-widest ml-1">
                   Mode
                 </p>
-                <div className="p-4 rounded-2xl bg-slate-950/50 border border-white/5 flex items-center gap-4 group">
-                  <div className="p-3 bg-cyan-500/10 rounded-xl group-hover:bg-cyan-500/20 transition-colors">
-                    {gameData.gameType === GAME_TYPE.SPADES ? (
-                      <Spade className="text-cyan-400" />
-                    ) : (
-                      <Blocks className="text-blue-400" />
-                    )}
+                <div className="p-4 rounded-2xl bg-slate-950/50 border border-white/5 flex items-center gap-4">
+                  <div className="flex items-center gap-4 min-w-0 flex-1 group">
+                    <div className="p-3 bg-cyan-500/10 rounded-xl group-hover:bg-cyan-500/20 transition-colors">
+                      {isSpadesMode ? (
+                        <Spade className="text-cyan-400" />
+                      ) : (
+                        <Blocks className="text-blue-400" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-black text-lg capitalize tracking-tight">
+                        {isSpadesMode ? GAME_TYPE.SPADES : GAME_TYPE.BID_WHIST}
+                      </p>
+                      <p className="text-[10px] text-slate-500 font-bold leading-tight">
+                        {isSpadesMode
+                          ? 'Partner-based trick taking.'
+                          : 'Dynamic bidding and suit selection.'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-black text-lg capitalize tracking-tight">
-                      {gameData.gameType === GAME_TYPE.SPADES ? 'Spades' : 'Bid Whist'}
-                    </p>
-                    <p className="text-[10px] text-slate-500 font-bold leading-tight">
-                      {gameData.gameType === GAME_TYPE.SPADES
-                        ? 'Partner-based trick taking.'
-                        : 'Dynamic bidding and suit selection.'}
-                    </p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOpenGameInfoModal(true)}
+                    className="h-10 w-10 shrink-0 rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/15 
+                      hover:border-cyan-300/30 transition-all duration-200 flex items-center justify-center active:scale-95"
+                    aria-label={`Open ${isSpadesMode ? GAME_TYPE.SPADES : GAME_TYPE.BID_WHIST} mode guide`}
+                  >
+                    <CircleHelp size={18} />
+                  </button>
                 </div>
               </div>
               <div className="space-y-3">
@@ -297,7 +315,7 @@ export const LobbyPage = ({
                 </div>
               </div>
             </div>
-            <div className="mt-8 space-y-4">
+            <div className="mt-6 space-y-4">
               {isHost ? (
                 <>
                   <Button variant="secondary" className="w-full h-14" disabled>
@@ -340,6 +358,223 @@ export const LobbyPage = ({
           </div>
         </div>
       </div>
+      {openGameInfoModal && (
+        <div className="fixed inset-0 z-80 flex items-center justify-center p-4 sm:p-6">
+          <button
+            type="button"
+            onClick={() => setOpenGameInfoModal(false)}
+            className="absolute inset-0 bg-slate-950/90 backdrop-blur-xl"
+            aria-label="Close game guide"
+          />
+          <div
+            className="relative z-10 w-full max-w-xl max-h-[min(680px,calc(100dvh-3rem))] overflow-hidden rounded-4xl border border-cyan-400/20 bg-slate-950/80
+              shadow-[0_35px_120px_rgba(6,182,212,0.18)] backdrop-blur-3xl animate-in fade-in zoom-in-95 duration-200"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${isSpadesMode ? GAME_TYPE.SPADES : GAME_TYPE.BID_WHIST} game information`}
+          >
+            <div className="pointer-events-none absolute -right-24 top-20 h-44 w-44 rounded-full bg-blue-600/20 blur-3xl" />
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.08)_0%,transparent_32%,rgba(6,182,212,0.08)_100%)]" />
+            <div className="relative z-10">
+              <div className="relative overflow-hidden border-b border-white/10 px-5 py-4 sm:px-6">
+                <div className="absolute right-6 top-3 text-[5.5rem] font-black leading-none text-white/2.5">
+                  {isSpadesMode ? SUITE_META[SPADE].symbol : SUITE_META[CLUB].symbol}
+                </div>
+                <div className="relative flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative">
+                      <div className="absolute inset-0 rounded-3xl bg-cyan-400/30 blur-xl" />
+                      <div
+                        className="relative flex h-13 w-13 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-400/10
+                          shadow-[inset_0_0_20px_rgba(6,182,212,0.12)]"
+                      >
+                        {isSpadesMode ? (
+                          <Spade className="text-cyan-200" size={28} />
+                        ) : (
+                          <Blocks className="text-cyan-200" size={28} />
+                        )}
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-black uppercase tracking-[0.3em] text-cyan-300/70">
+                        Quick Rules
+                      </p>
+                      <h3 className="mt-0.5 text-2xl font-black tracking-tight text-white">
+                        {isSpadesMode ? GAME_TYPE.SPADES : GAME_TYPE.BID_WHIST}
+                      </h3>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOpenGameInfoModal(false)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 transition-all
+                      hover:border-cyan-300/30 hover:bg-cyan-400/10 hover:text-cyan-200 active:scale-95"
+                    aria-label="Close modal"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+              </div>
+              <div className="px-5 py-4 sm:px-6">
+                {isSpadesMode ? (
+                  <div className="space-y-3.5">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-2xl border border-white/10 bg-white/4 px-3 py-2.5 text-center">
+                        <p className="text-base font-black text-white">
+                          {GAME_CONFIG[GAME_TYPE.SPADES]?.maxPlayers}
+                        </p>
+                        <p className="text-[8px] font-black uppercase tracking-widest text-slate-500">
+                          Players
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-white/10 bg-white/4 px-3 py-2.5 text-center">
+                        <p className="text-base font-black text-white">2</p>
+                        <p className="text-[8px] font-black uppercase tracking-widest text-slate-500">
+                          Teams
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2.5 text-center">
+                        <p className="text-base font-black text-cyan-200">♠</p>
+                        <p className="text-[8px] font-black uppercase tracking-widest text-cyan-300/70">
+                          Trump
+                        </p>
+                      </div>
+                    </div>
+                    <div className="rounded-3xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3">
+                      <p className="text-xs font-bold leading-relaxed text-slate-100">
+                        Win tricks with your partner. Spades are trump. Teams are picked randomly.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-500">
+                        Variants
+                      </p>
+                      <div className="grid gap-2">
+                        <div
+                          className="relative overflow-hidden rounded-[1.25rem] border border-white/10 bg-slate-900/60 px-4 py-3 transition-all
+                          hover:border-cyan-300/30 hover:bg-slate-900"
+                        >
+                          <div className="absolute right-4 top-2 text-3xl font-black text-white/3">
+                            01
+                          </div>
+                          <p className="text-sm font-black text-white">{SPADES_VARIANT.OH_HELL}</p>
+                          <p className="mt-0.5 text-xs font-bold text-slate-400">
+                            13 rounds total. nth Round n tricks, until 13.
+                          </p>
+                        </div>
+                        <div
+                          className="relative overflow-hidden rounded-[1.25rem] border border-white/10 bg-slate-900/60 px-4 py-3 transition-all
+                          hover:border-cyan-300/30 hover:bg-slate-900"
+                        >
+                          <div className="absolute right-4 top-2 text-3xl font-black text-white/3">
+                            02
+                          </div>
+                          <p className="text-sm font-black text-white">{SPADES_VARIANT.CLASSIC}</p>
+                          <p className="mt-0.5 text-xs font-bold text-slate-400">
+                            1 round total. All 13 tricks are played in a single round.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3.5">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-2xl border border-white/10 bg-white/4 px-3 py-2.5 text-center">
+                        <p className="text-base font-black text-white">
+                          {`${GAME_CONFIG[GAME_TYPE.BID_WHIST]?.minPlayers} - ${GAME_CONFIG[GAME_TYPE.BID_WHIST]?.maxPlayers}`}
+                        </p>
+                        <p className="text-[8px] font-black uppercase tracking-widest text-slate-500">
+                          Players
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-white/10 bg-white/4 px-3 py-2.5 text-center">
+                        <p className="text-base font-black text-white">Bid</p>
+                        <p className="text-[8px] font-black uppercase tracking-widest text-slate-500">
+                          First
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2.5 text-center">
+                        <p className="text-base font-black text-cyan-200">Lead</p>
+                        <p className="text-[8px] font-black uppercase tracking-widest text-cyan-300/70">
+                          Winner
+                        </p>
+                      </div>
+                    </div>
+                    <div className="rounded-3xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3">
+                      <p className="text-xs font-bold leading-relaxed text-slate-100">
+                        Bid to control the round. Highest bidder leads, then everyone fights for
+                        tricks.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-500">
+                        Variants
+                      </p>
+                      <div className="grid gap-2">
+                        <div
+                          className="relative overflow-hidden rounded-[1.25rem] border border-white/10 bg-slate-900/60 px-4 py-3 transition-all
+                          hover:border-cyan-300/30 hover:bg-slate-900"
+                        >
+                          <div className="absolute right-4 top-2 text-3xl font-black text-white/3">
+                            ↑
+                          </div>
+                          <p className="text-sm font-black text-white">
+                            {BID_WHIST_VARIANT.UPTOWN}
+                          </p>
+                          <p className="mt-0.5 text-xs font-bold text-slate-400">
+                            {' '}
+                            Highest card in the led suit wins the trick.
+                          </p>
+                        </div>
+                        <div
+                          className="relative overflow-hidden rounded-[1.25rem] border border-white/10 bg-slate-900/60 px-4 py-3 transition-all
+                          hover:border-cyan-300/30 hover:bg-slate-900"
+                        >
+                          <div className="absolute right-4 top-2 text-3xl font-black text-white/3">
+                            ↓
+                          </div>
+                          <p className="text-sm font-black text-white">
+                            {BID_WHIST_VARIANT.DOWNTOWN}
+                          </p>
+                          <p className="mt-0.5 text-xs font-bold text-slate-400">
+                            Lowest card in the led suit wins the trick.
+                          </p>
+                        </div>
+                        <div
+                          className="relative overflow-hidden rounded-[1.25rem] border border-white/10 bg-slate-900/60 px-4 py-3 transition-all
+                          hover:border-cyan-300/30 hover:bg-slate-900"
+                        >
+                          <div className="absolute right-4 top-2 text-3xl font-black text-white/3">
+                            Ø
+                          </div>
+                          <p className="text-sm font-black text-white">
+                            {BID_WHIST_VARIANT.NO_TRUMP.trim()}
+                          </p>
+                          <p className="mt-0.5 text-xs font-bold text-slate-400">
+                            No trump suit. Follow the led suit to win tricks.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div className="mt-6 mb-3 flex items-center justify-center">
+                  <Button
+                    variant="primary"
+                    className="h-12 flex-1 max-w-90"
+                    onClick={() => setOpenGameInfoModal(false)}
+                  >
+                    <span className="text-[11px] font-black uppercase tracking-[0.22em]">
+                      Got It
+                    </span>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

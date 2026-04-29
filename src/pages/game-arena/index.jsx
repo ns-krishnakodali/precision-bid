@@ -104,7 +104,7 @@ const PlayerCard = ({ player, isPlayerTurn = false, isTurnStarter = false }) => 
 
   return (
     <div
-      className={`relative rounded-xl border backdrop-blur-xl px-2.5 py-1.5 shadow-[0_10px_25px_rgba(0,0,0,0.5)] w-25 sm:w-30 flex flex-col items-center text-center ${
+      className={`relative rounded-xl border backdrop-blur-xl px-2.5 py-1.5 shadow-[0_10px_25px_rgba(0,0,0,0.5)] w-full min-w-0 sm:w-30 flex flex-col items-center text-center ${
         isPlayerTurn
           ? 'bg-cyan-500/20 border-cyan-400/50 shadow-[0_0_22px_rgba(6,182,212,0.35)]'
           : 'bg-slate-950/80 border-white/15'
@@ -166,14 +166,16 @@ const GameSeat = ({ player, totalSeats, seatIndex, playedCard, isPlayerTurn, isT
 
   return (
     <div
-      className="absolute z-20"
+      className="relative z-20 min-w-0 sm:absolute sm:left-[var(--seat-x)] sm:top-[var(--seat-y)] sm:-translate-x-1/2 sm:-translate-y-1/2"
       style={{
-        left: `${playersPosition.x}%`,
-        top: `${playersPosition.y}%`,
-        transform: 'translate(-50%, -50%)',
+        '--seat-x': `${playersPosition.x}%`,
+        '--seat-y': `${playersPosition.y}%`,
       }}
     >
-      <div className="relative flex flex-col items-center gap-1.5 sm:gap-2">
+      <div
+        className="relative flex min-w-0 flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-slate-950/55 p-2 shadow-[0_16px_40px_rgba(0,0,0,0.32)]
+          backdrop-blur-xl sm:gap-2 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none"
+      >
         <div className="relative z-20 -mb-0.5 perspective-[900px]">
           <div
             className={`relative w-11 h-16 transform-3d transition-transform duration-450
@@ -203,7 +205,7 @@ const GameSeat = ({ player, totalSeats, seatIndex, playedCard, isPlayerTurn, isT
             </div>
           </div>
         </div>
-        <div className="relative z-10">
+        <div className="relative z-10 w-full sm:w-auto">
           <PlayerCard player={player} isPlayerTurn={isPlayerTurn} isTurnStarter={isTurnStarter} />
         </div>
       </div>
@@ -374,7 +376,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
       <div className="absolute top-[-30%] left-[-10%] w-[60%] h-[60%] bg-cyan-500/10 rounded-full blur-[160px]" />
       <div className="absolute bottom-[-35%] right-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[160px]" />
       <div className="absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(#1e293b_1px,transparent_1px)] bg-size-[40px_40px]" />
-      <div className="relative z-10 px-8 py-6">
+      <div className="relative z-10 px-4 py-5 sm:px-8 sm:py-6">
         <header className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <div className="relative shrink-0">
@@ -464,39 +466,42 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
             </span>
           </div>
         </div>
-        <main className="mt-2 flex flex-col items-center">
+        <main className="mt-4 flex flex-col items-center sm:mt-2">
           <div className="w-full max-w-7xl">
             <div
               ref={tableRef}
-              className="relative w-full aspect-4/3 sm:aspect-16/10 lg:aspect-video"
+              className="relative w-full overflow-hidden rounded-[1.75rem] px-3 py-4 sm:aspect-16/10 sm:overflow-visible sm:rounded-none sm:p-0 lg:aspect-video"
             >
               <div className="absolute inset-0">
-                <div className="absolute inset-[2%] rounded-[999px] bg-[radial-gradient(ellipse_at_center,rgba(6,182,212,0.18)_0%,transparent_65%)] blur-2xl" />
-                <div className="absolute inset-[4%] rounded-[999px] bg-linear-to-b from-slate-700 via-slate-900 to-slate-950 shadow-[0_40px_120px_rgba(0,0,0,0.75)]">
-                  <div className="absolute inset-0 rounded-[999px] shadow-[inset_0_2px_0_rgba(255,255,255,0.08),inset_0_-2px_0_rgba(0,0,0,0.6)]" />
+                <div className="absolute inset-0 rounded-[1.75rem] bg-[radial-gradient(ellipse_at_center,rgba(6,182,212,0.18)_0%,transparent_65%)] blur-2xl sm:inset-[2%] sm:rounded-[999px]" />
+                <div className="absolute inset-0 rounded-[1.75rem] bg-linear-to-b from-slate-700 via-slate-900 to-slate-950 shadow-[0_40px_120px_rgba(0,0,0,0.75)] sm:inset-[4%] sm:rounded-[999px]">
+                  <div className="absolute inset-0 rounded-[inherit] shadow-[inset_0_2px_0_rgba(255,255,255,0.08),inset_0_-2px_0_rgba(0,0,0,0.6)]" />
                 </div>
-                <div className="absolute inset-[6%] rounded-[999px] border-2 border-dashed border-white/10" />
-                <div className="absolute inset-[7%] rounded-[999px] overflow-hidden bg-linear-to-br from-emerald-950 via-slate-950 to-emerald-950">
+                <div className="absolute inset-2 rounded-[1.35rem] border-2 border-dashed border-white/10 sm:inset-[6%] sm:rounded-[999px]" />
+                <div className="absolute inset-3 overflow-hidden rounded-[1.25rem] bg-linear-to-br from-emerald-950 via-slate-950 to-emerald-950 sm:inset-[7%] sm:rounded-[999px]">
                   <div className="absolute inset-0 opacity-40 bg-[repeating-linear-gradient(45deg,transparent_0px,transparent_3px,rgba(255,255,255,0.025)_3px,rgba(255,255,255,0.025)_4px)]" />
                   <div className="absolute inset-0 opacity-40 bg-[repeating-linear-gradient(-45deg,transparent_0px,transparent_3px,rgba(255,255,255,0.025)_3px,rgba(255,255,255,0.025)_4px)]" />
                   <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_15%,rgba(255,255,255,0.12)_0%,transparent_55%)]" />
                   <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(6,182,212,0.1)_0%,transparent_60%)]" />
                   <div className="absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.8)]" />
-                  <div className="absolute inset-[14%] rounded-[999px] border border-white/5" />
-                  <div className="absolute inset-[28%] rounded-[999px] border border-white/5" />
-                  <div className="absolute inset-[3%] rounded-[999px] border border-dashed border-white/10" />
+                  <div className="absolute inset-[14%] hidden rounded-[999px] border border-white/5 sm:block" />
+                  <div className="absolute inset-[28%] hidden rounded-[999px] border border-white/5 sm:block" />
+                  <div className="absolute inset-[3%] hidden rounded-[999px] border border-dashed border-white/10 sm:block" />
                 </div>
               </div>
               {isSpadesGame && (
-                <div className="absolute inset-0 pointer-events-none z-5">
+                <div className="pointer-events-none absolute inset-0 z-5 hidden sm:block">
                   <div className="absolute left-[14%] right-[14%] top-1/2 -translate-y-1/2 border-t border-dashed border-white/14" />
                   <div className="absolute top-[14%] bottom-[14%] left-1/2 -translate-x-1/2 border-l border-dashed border-white/14" />
                   <div className="absolute left-[14%] right-[14%] top-1/2 -translate-y-1/2 h-px bg-linear-to-r from-transparent via-cyan-300/15 to-transparent" />
                   <div className="absolute top-[14%] bottom-[14%] left-1/2 -translate-x-1/2 w-px bg-linear-to-b from-transparent via-cyan-300/15 to-transparent" />
                 </div>
               )}
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-7">
-                <div className="relative w-53">
+              <div
+                className="pointer-events-none relative z-20 flex justify-center mt-2 sm:mt-0 sm:absolute sm:inset-0 sm:z-7 sm:flex-col sm:items-center
+                  sm:justify-center"
+              >
+                <div className="relative w-56 sm:w-53">
                   <div className="absolute -inset-2 rounded-full bg-cyan-500/20 blur-xl animate-pulse" />
                   <div className="relative rounded-full p-0.5 overflow-hidden">
                     <div
@@ -510,19 +515,20 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                     <div className="relative px-5 py-3 sm:py-4 rounded-full bg-slate-950/90 backdrop-blur-xl text-center overflow-hidden">
                       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.22)_0%,transparent_65%)]" />
                       <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-400/60 to-transparent" />
-                      <div className="relative z-10 flex items-center gap-2.5 sm:gap-3">
+                      <div className="relative z-10 flex min-w-0 items-center gap-2.5 sm:gap-3">
                         <span className="relative flex shrink-0">
                           <span className="absolute inline-flex h-2 w-2 rounded-full bg-cyan-400 opacity-75 animate-ping" />
                           <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.9)]" />
                         </span>
                         <div
                           key={`${gameData.roundStatus}-${gameData.statusText || `Waiting for ${currentPlayer}`}`}
-                          className="text-left leading-tight motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300"
+                          className="min-w-0 text-left leading-tight motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1
+                            motion-safe:duration-300"
                         >
                           <p className="text-[10px] text-cyan-300/80 font-black uppercase tracking-[0.35em]">
                             {gameData.roundStatus}
                           </p>
-                          <p className="mt-1 block max-w-34 truncate text-sm font-semibold tracking-wider text-cyan-200 bg-clip-text sm:max-w-38">
+                          <p className="mt-1 block max-w-45 truncate text-sm font-semibold tracking-wider text-cyan-200 bg-clip-text sm:max-w-38">
                             {gameData.statusText || `Waiting for ${currentPlayer}`}
                           </p>
                         </div>
@@ -531,7 +537,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                   </div>
                 </div>
               </div>
-              <div className="absolute inset-0">
+              <div className="relative z-20 mt-4 grid grid-cols-[repeat(auto-fit,minmax(8.25rem,1fr))] gap-2.5 sm:absolute sm:inset-0 sm:mt-0 sm:block">
                 {players.map((player, idx) => (
                   <GameSeat
                     key={idx}
@@ -546,7 +552,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
               </div>
             </div>
             <Border />
-            <div className="mt-6 mb-2">
+            <div className="mt-4 sm:mt-6 mb-2">
               <div className="flex items-end justify-between gap-4 px-2">
                 <div>
                   <h2 className="text-lg sm:text-xl lg:text-2xl font-black tracking-tight">
@@ -725,37 +731,21 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                                   <p className="truncate text-sm font-black tracking-wide text-white">
                                     {teamPlayer.name}
                                   </p>
-                                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                                    <p className="text-[9px] font-black uppercase tracking-[0.24em] text-slate-500">
-                                      Player
-                                    </p>
-                                    <div
-                                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 ${
-                                        (teamPlayer.accumulated ?? 0) > 0
-                                          ? 'border-amber-400/20 bg-amber-400/10'
-                                          : 'border-white/12 bg-white/5'
-                                      }`}
-                                    >
-                                      <span
-                                        className={`text-[9px] font-black uppercase tracking-[0.2em] ${
-                                          (teamPlayer.accumulated ?? 0) > 0
-                                            ? 'text-amber-200/70'
-                                            : 'text-slate-400'
-                                        }`}
-                                      >
-                                        Accum.
-                                      </span>
-                                      <span
-                                        className={`text-[10px] font-black tabular-nums ${
-                                          (teamPlayer.accumulated ?? 0) > 0
-                                            ? 'text-amber-100'
-                                            : 'text-slate-200'
-                                        }`}
-                                      >
-                                        {teamPlayer.accumulated ?? 0}
-                                      </span>
+                                  {(teamPlayer.accumulated ?? 0) > 0 && (
+                                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                      <p className="text-[9px] font-black uppercase tracking-[0.24em] text-slate-500">
+                                        Player
+                                      </p>
+                                      <div className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 border-amber-400/20 bg-amber-400/10">
+                                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-200/70">
+                                          Accum.
+                                        </span>
+                                        <span className="text-[10px] font-black tabular-nums text-amber-100">
+                                          {teamPlayer.accumulated ?? 0}
+                                        </span>
+                                      </div>
                                     </div>
-                                  </div>
+                                  )}
                                 </div>
                               </div>
                               <div className="shrink-0 pl-2 text-right">
@@ -1253,7 +1243,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
               <h3 className="mt-2 text-3xl sm:text-4xl font-black tracking-tight">
                 {winnerNames.includes(playerName)
                   ? winnerNames.length > 1
-                    ? 'You Tied for the Win!'
+                    ? 'Shared Victory!'
                     : 'You Won!'
                   : winnerNames.length > 1
                     ? 'Winners'

@@ -5,6 +5,8 @@ import {
   BIDDING,
   BIG_JOKER,
   CARDS_ORDER,
+  FINALIZING_RESULTS_MESSAGE,
+  GAME_OVER_STATUS,
   GAME_STATUS,
   GAME_TYPE,
   JOKER,
@@ -228,9 +230,14 @@ const updateTurnWinner = async (lobbyId) => {
     roundNumber = lobbyData?.roundNumber;
     startNewRound = lobbyData.rounds.at(-1)?.currentTurn === roundNumber;
 
-    if (startNewRound && roundNumber < MAX_ROUNDS) {
-      lobbyData.roundStatus = NEW_ROUND_STATUS;
-      lobbyData.statusText = ROUND_START_MESSAGE;
+    if (startNewRound) {
+      if (roundNumber < MAX_ROUNDS) {
+        lobbyData.roundStatus = NEW_ROUND_STATUS;
+        lobbyData.statusText = ROUND_START_MESSAGE;
+      } else {
+        lobbyData.roundStatus = GAME_OVER_STATUS;
+        lobbyData.statusText = FINALIZING_RESULTS_MESSAGE;
+      }
     } else if (!startNewRound) {
       lobbyData.roundStatus = NEW_TURN_STATUS;
       lobbyData.statusText = TURN_START_MESSAGE;
@@ -239,9 +246,7 @@ const updateTurnWinner = async (lobbyId) => {
     return lobbyData;
   });
 
-  if (!startNewRound || (roundNumber ?? MAX_ROUNDS) < MAX_ROUNDS) {
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-  }
+  await new Promise((resolve) => setTimeout(resolve, 1200));
 
   await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
     if (!lobbyData) return lobbyData;

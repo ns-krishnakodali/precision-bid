@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { Blocks, Loader2, LockKeyhole, ShieldCheck, Spade, User } from 'lucide-react';
+import { Blocks, LockKeyhole, ShieldCheck, Spade, User } from 'lucide-react';
 
 import { GAME_TYPE } from '../../constants';
 

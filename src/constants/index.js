@@ -19,8 +19,10 @@ export const GAME_STATUS = 'Game Status';
 export const NEW_ROUND_STATUS = 'New Round';
 export const NEW_TURN_STATUS = 'New Turn';
 export const SELECT_TRUMP_STATUS = 'Selecting Suit';
+export const GAME_OVER_STATUS = 'Game Over';
 export const TURN_START_MESSAGE = 'Next trick starting';
 export const ROUND_START_MESSAGE = 'Starting a new round';
+export const FINALIZING_RESULTS_MESSAGE = 'Finalizing the results';
 
 export const LOBBY_DETAILS = 'LOBBY_DETAILS';
 
@@ -80,10 +82,10 @@ export const GAME_ROUNDS = {
 };
 
 export const SUITE_META = {
-  [SPADE]: { symbol: '\u2660', color: 'text-slate-900' },
+  [SPADE]: { symbol: '\u2660', color: 'text-black' },
   [HEART]: { symbol: '\u2665', color: 'text-rose-600' },
   [DIAMOND]: { symbol: '\u2666', color: 'text-rose-600' },
-  [CLUB]: { symbol: '\u2663', color: 'text-slate-900' },
+  [CLUB]: { symbol: '\u2663', color: 'text-black' },
   [JOKER]: { symbol: '\u2605', color: 'text-violet-600' },
 };
 
