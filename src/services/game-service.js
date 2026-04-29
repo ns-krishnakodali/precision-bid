@@ -304,10 +304,10 @@ const updateTurnWinner = async (lobbyId) => {
         lobbyData.currentPlayerIdx = currentRound.startPlayerIdx;
       }
     }
-    currentRound.currentTurn += 1;
 
     if (!startNewRound) {
       lobbyData.roundStatus = GAME_STATUS;
+      currentRound.currentTurn += 1;
     }
     lobbyData.statusText = '';
 

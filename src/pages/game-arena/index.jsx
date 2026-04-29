@@ -166,7 +166,7 @@ const GameSeat = ({ player, totalSeats, seatIndex, playedCard, isPlayerTurn, isT
 
   return (
     <div
-      className="relative z-20 min-w-0 sm:absolute sm:left-[var(--seat-x)] sm:top-[var(--seat-y)] sm:-translate-x-1/2 sm:-translate-y-1/2"
+      className="relative z-20 min-w-0 sm:absolute sm:left-(--seat-x) sm:top-(--seat-y) sm:-translate-x-1/2 sm:-translate-y-1/2"
       style={{
         '--seat-x': `${playersPosition.x}%`,
         '--seat-y': `${playersPosition.y}%`,
@@ -1293,20 +1293,18 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                   </div>
                 </div>
               </div>
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                <ActionButton variant="primary" onClick={onLeave} className="h-12">
-                  Continue
-                </ActionButton>
+              <div className="mt-6 grid grid-cols-1 justify-center gap-4 sm:grid-cols-[repeat(2,max-content)]">
                 <ActionButton
+                  className="h-12 w-full sm:w-52"
                   onClick={() => {
                     setOpenScoreCardModal(true);
                   }}
-                  className="h-12"
                 >
                   <BarChart3 size={18} className="text-cyan-300" />
                   View Stats
                 </ActionButton>
-                <ActionButton onClick={onLeave} variant="danger" className="h-12">
+
+                <ActionButton variant="danger" className="h-12 w-full sm:w-52" onClick={onLeave}>
                   <LogOut size={18} />
                   Leave Game
                 </ActionButton>
