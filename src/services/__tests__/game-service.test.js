@@ -74,6 +74,7 @@ const playedOnLastTurn = (cardDetails) =>
 const createLobby = (overrides = {}) => ({
   currentPlayerIdx: 0,
   gameType: GAME_TYPE.SPADES,
+  host: 'Player1',
   players: createPlayers(),
   roundNumber: 1,
   roundStatus: GAME_STATUS,
@@ -313,6 +314,37 @@ describe('gameService', () => {
       expect(data.rounds.at(-1).trumpSuit).toBe('');
     });
 
+    it('moves Bid Whist no-trump control to the highest bidder before play starts', async () => {
+      const transaction = useTransactionData(
+        createLobby({
+          gameType: GAME_TYPE.BID_WHIST,
+          rounds: [
+            {
+              currentTurn: 0,
+              players: createRoundPlayers({
+                Player1: { bids: 1 },
+                Player2: { bids: 4 },
+                Player3: { bids: 2 },
+                Player4: { bids: 3 },
+              }),
+              startPlayerIdx: 0,
+              trumpSuit: '',
+            },
+          ],
+          variant: BID_WHIST_VARIANT.NO_TRUMP,
+        })
+      );
+
+      await gameService.updateRoundTrump('lobby-1', '');
+
+      const data = transaction.getData();
+      expect(data.currentPlayerIdx).toBe(1);
+      expect(data.roundStatus).toBe(GAME_STATUS);
+      expect(data.rounds.at(-1).currentTurn).toBe(1);
+      expect(data.rounds.at(-1).startPlayerIdx).toBe(1);
+      expect(data.rounds.at(-1).trumpSuit).toBe('');
+    });
+
     it('rejects null trump values while preserving Firebase error propagation', async () => {
       useTransactionData(createLobby());
       await expect(gameService.updateRoundTrump('lobby-1', null)).rejects.toThrow(
@@ -331,6 +363,272 @@ describe('gameService', () => {
       const transaction = useTransactionData(null);
       await gameService.updateRoundTrump('lobby-1', HEART);
       expect(transaction.getData()).toBeNull();
+    });
+  });
+
+  describe('processBotAction', () => {
+    it('does nothing when the caller is not the host', async () => {
+      const transaction = useTransactionData(
+        createLobby({
+          currentPlayerIdx: 1,
+          players: {
+            ...createPlayers(),
+            Player2: { ...createPlayers().Player2, isBot: true },
+          },
+          roundStatus: BIDDING,
+          rounds: [
+            {
+              currentTurn: 0,
+              players: createNewRoundPlayers(),
+              startPlayerIdx: 0,
+              trumpSuit: '',
+            },
+          ],
+        })
+      );
+
+      await expect(gameService.processBotAction('lobby-1', 'Player2')).resolves.toBe(false);
+
+      const data = transaction.getData();
+      expect(data.currentPlayerIdx).toBe(1);
+      expect(data.rounds.at(-1).players.Player2.hasBid).toBeUndefined();
+    });
+
+    it('bids for consecutive bots from the host machine only', async () => {
+      const players = createPlayers();
+      const transaction = useTransactionData(
+        createLobby({
+          currentPlayerIdx: 1,
+          players: {
+            ...players,
+            Player2: {
+              ...players.Player2,
+              cards: [card('A', SPADE), card('K', SPADE), card('A', HEART)],
+              isBot: true,
+            },
+            Player3: {
+              ...players.Player3,
+              cards: [card('2', CLUB), card('3', DIAMOND), card('4', HEART)],
+              isBot: true,
+            },
+          },
+          roundNumber: 3,
+          roundStatus: BIDDING,
+          rounds: [
+            {
+              currentTurn: 0,
+              players: createNewRoundPlayers(),
+              startPlayerIdx: 1,
+              trumpSuit: '',
+            },
+          ],
+        })
+      );
+
+      await expect(gameService.processBotAction('lobby-1', 'Player1')).resolves.toBe(true);
+      expect(transaction.getData().rounds.at(-1).players.Player2).toMatchObject({
+        bids: 3,
+        hasBid: true,
+      });
+      expect(transaction.getData().currentPlayerIdx).toBe(2);
+
+      await expect(gameService.processBotAction('lobby-1', 'Player1')).resolves.toBe(true);
+      expect(transaction.getData().rounds.at(-1).players.Player3.hasBid).toBe(true);
+      expect(transaction.getData().currentPlayerIdx).toBe(3);
+    });
+
+    it('chooses trump from low-card strength for Bid Whist Downtown', async () => {
+      const players = createPlayers();
+      const transaction = useTransactionData(
+        createLobby({
+          currentPlayerIdx: 1,
+          gameType: GAME_TYPE.BID_WHIST,
+          players: {
+            ...players,
+            Player2: {
+              ...players.Player2,
+              cards: [card('2', CLUB), card('3', CLUB), card('4', CLUB), card('A', HEART)],
+              isBot: true,
+            },
+          },
+          roundStatus: SELECT_TRUMP_STATUS,
+          rounds: [
+            {
+              currentTurn: 0,
+              players: createRoundPlayers({
+                Player2: { bids: 3, hasBid: true },
+              }),
+              startPlayerIdx: 1,
+              trumpSuit: '',
+            },
+          ],
+          variant: BID_WHIST_VARIANT.DOWNTOWN,
+        })
+      );
+
+      await expect(gameService.processBotAction('lobby-1', 'Player1')).resolves.toBe(true);
+
+      const data = transaction.getData();
+      expect(data.roundStatus).toBe(GAME_STATUS);
+      expect(data.currentPlayerIdx).toBe(1);
+      expect(data.rounds.at(-1).currentTurn).toBe(1);
+      expect(data.rounds.at(-1).trumpSuit).toBe(CLUB);
+    });
+
+    it('follows suit and plays the cheapest winning card when a bot needs a trick', async () => {
+      const players = createPlayers();
+      const transaction = useTransactionData(
+        createLobby({
+          currentPlayerIdx: 1,
+          gameType: GAME_TYPE.BID_WHIST,
+          players: {
+            ...players,
+            Player2: {
+              ...players.Player2,
+              cards: [card('Q', CLUB), card('K', CLUB), card('A', SPADE)],
+              isBot: true,
+            },
+          },
+          roundNumber: MAX_ROUNDS,
+          rounds: [
+            {
+              currentTurn: 1,
+              players: createRoundPlayers({
+                Player1: { played: [card('J', CLUB)] },
+                Player2: { bids: 1, played: [], wins: 0 },
+              }),
+              startPlayerIdx: 0,
+              trumpSuit: '',
+            },
+          ],
+          variant: BID_WHIST_VARIANT.NO_TRUMP,
+        })
+      );
+
+      await expect(gameService.processBotAction('lobby-1', 'Player1')).resolves.toBe(true);
+
+      const data = transaction.getData();
+      expect(data.rounds.at(-1).players.Player2.played).toEqual([card('Q', CLUB)]);
+      expect(data.players.Player2.cards).toEqual([card('K', CLUB), card('A', SPADE)]);
+      expect(data.currentPlayerIdx).toBe(2);
+    });
+
+    it('supports a winning Spades teammate instead of overtaking the trick', async () => {
+      const players = createPlayers();
+      const transaction = useTransactionData(
+        createLobby({
+          currentPlayerIdx: 2,
+          players: {
+            ...players,
+            Player3: {
+              ...players.Player3,
+              cards: [card('Q', HEART), card('2', HEART), card('A', SPADE)],
+              isBot: true,
+            },
+          },
+          roundNumber: 3,
+          rounds: [
+            {
+              currentTurn: 1,
+              players: createRoundPlayers({
+                Player1: { bids: 1, played: [card('A', HEART)], wins: 0 },
+                Player2: { bids: 1, played: [card('K', HEART)], wins: 0 },
+                Player3: { bids: 2, played: [], wins: 0 },
+              }),
+              startPlayerIdx: 0,
+              trumpSuit: SPADE,
+            },
+          ],
+        })
+      );
+
+      await expect(gameService.processBotAction('lobby-1', 'Player1')).resolves.toBe(true);
+
+      expect(transaction.getData().rounds.at(-1).players.Player3.played).toEqual([
+        card('2', HEART),
+      ]);
+    });
+
+    it('resolves the trick when the last play is a bot action', async () => {
+      vi.useFakeTimers();
+      const players = createPlayers();
+      const transaction = useTransactionData(
+        createLobby({
+          currentPlayerIdx: 3,
+          players: {
+            ...players,
+            Player4: {
+              ...players.Player4,
+              cards: [card('J', SPADE)],
+              isBot: true,
+            },
+          },
+          roundNumber: 3,
+          rounds: [
+            {
+              currentTurn: 1,
+              players: createRoundPlayers({
+                Player1: { played: [card('A', SPADE)], wins: 0 },
+                Player2: { played: [card('K', SPADE)], wins: 0 },
+                Player3: { played: [card('Q', SPADE)], wins: 0 },
+                Player4: { bids: 0, played: [], wins: 0 },
+              }),
+              startPlayerIdx: 0,
+              trumpSuit: SPADE,
+            },
+          ],
+        })
+      );
+
+      const processPromise = gameService.processBotAction('lobby-1', 'Player1');
+      await vi.advanceTimersByTimeAsync(1200);
+      await expect(processPromise).resolves.toBe(true);
+
+      const data = transaction.getData();
+      expect(data.rounds.at(-1).players.Player4.played).toEqual([card('J', SPADE)]);
+      expect(data.rounds.at(-1).players.Player1.wins).toBe(1);
+      expect(data.rounds.at(-1).currentTurn).toBe(2);
+      expect(data.currentPlayerIdx).toBe(0);
+      expect(data.roundStatus).toBe(GAME_STATUS);
+    });
+
+    it('skips missing data, human turns, already-played bot turns, and Firebase failures safely', async () => {
+      const missingTransaction = useTransactionData(null);
+      await expect(gameService.processBotAction('lobby-1', 'Player1')).resolves.toBe(false);
+      expect(missingTransaction.getData()).toBeNull();
+
+      const humanTransaction = useTransactionData(createLobby());
+      await expect(gameService.processBotAction('lobby-1', 'Player1')).resolves.toBe(false);
+      expect(humanTransaction.getData().rounds.at(-1).players.Player1.played).toEqual([]);
+
+      const players = createPlayers();
+      const playedTransaction = useTransactionData(
+        createLobby({
+          players: {
+            ...players,
+            Player1: { ...players.Player1, isBot: true },
+          },
+          rounds: [
+            {
+              currentTurn: 1,
+              players: createRoundPlayers({
+                Player1: { played: [card('A', SPADE)] },
+              }),
+              startPlayerIdx: 0,
+              trumpSuit: SPADE,
+            },
+          ],
+        })
+      );
+      await expect(gameService.processBotAction('lobby-1', 'Player1')).resolves.toBe(false);
+      expect(playedTransaction.getData().rounds.at(-1).players.Player1.played).toEqual([
+        card('A', SPADE),
+      ]);
+
+      runTransaction.mockRejectedValueOnce(new Error('bot transaction failed'));
+      await expect(gameService.processBotAction('lobby-1', 'Player1')).rejects.toThrow(
+        'bot transaction failed'
+      );
     });
   });
 

@@ -69,6 +69,8 @@ export const LobbyPage = ({
   onVariantChange,
 }) => {
   const [isCodeCopied, setIsCodeCopied] = useState(false);
+  const [isAddingBot, setIsAddingBot] = useState(false);
+  const [removingBotName, setRemovingBotName] = useState('');
   const [openGameInfoModal, setOpenGameInfoModal] = useState(false);
 
   const codeCopiedTimeoutRef = useRef(null);
@@ -91,6 +93,7 @@ export const LobbyPage = ({
   const minPlayers = GAME_CONFIG[gameData.gameType]?.minPlayers;
   const maxPlayers = GAME_CONFIG[gameData.gameType]?.maxPlayers;
   const isSpadesMode = gameData?.gameType === GAME_TYPE.SPADES;
+  const canAddBot = isHost && gameData.players.length < maxPlayers;
 
   const showCodeCopied = () => {
     setIsCodeCopied(true);
@@ -144,6 +147,32 @@ export const LobbyPage = ({
       onLeave();
     } catch (err) {
       console.error('Leave game error:', err);
+    }
+  };
+
+  const handleAddBot = async () => {
+    if (!canAddBot) return;
+
+    setIsAddingBot(true);
+    try {
+      await lobbyService.addBot(lobbyId);
+    } catch (err) {
+      console.error('Add bot error:', err);
+    } finally {
+      setIsAddingBot(false);
+    }
+  };
+
+  const handleRemoveBot = async (botName) => {
+    if (!isHost) return;
+
+    setRemovingBotName(botName);
+    try {
+      await lobbyService.removePlayer(lobbyId, botName);
+    } catch (err) {
+      console.error('Remove bot error:', err);
+    } finally {
+      setRemovingBotName('');
     }
   };
 
@@ -206,9 +235,21 @@ export const LobbyPage = ({
               >
                 <div
                   className={`w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center font-black text-xl shadow-lg transition-transform group-hover:rotate-3
-                    ${player.isHost ? 'bg-linear-to-br from-cyan-400 to-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+                    ${
+                      player.isHost
+                        ? 'bg-linear-to-br from-cyan-400 to-blue-600 text-white'
+                        : player.isBot
+                          ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-400/20'
+                          : 'bg-slate-800 text-slate-400'
+                    }`}
                 >
-                  {player.isHost ? <ShieldUser size={32} /> : <User size={28} />}
+                  {player.isHost ? (
+                    <ShieldUser size={32} />
+                  ) : player.isBot ? (
+                    <Bot size={28} />
+                  ) : (
+                    <User size={28} />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-lg font-black flex items-center gap-2 flex-wrap">
@@ -223,7 +264,7 @@ export const LobbyPage = ({
                     )}
                   </div>
                   <div className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em]">
-                    {player.isHost ? 'Host' : 'Player'}
+                    {player.isHost ? 'Host' : player.isBot ? 'Bot' : 'Player'}
                   </div>
                 </div>
                 <div
@@ -232,6 +273,23 @@ export const LobbyPage = ({
                 >
                   CONNECTED
                 </div>
+                {isHost && player.isBot && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveBot(player.name)}
+                    disabled={removingBotName === player.name}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-300
+                      transition-all hover:border-rose-400/35 hover:bg-rose-500/15 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label={`Remove ${player.name}`}
+                    title={`Remove ${player.name}`}
+                  >
+                    {removingBotName === player.name ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <X size={16} />
+                    )}
+                  </button>
+                )}
               </div>
             ))}
             <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden mt-2">
@@ -318,7 +376,13 @@ export const LobbyPage = ({
             <div className="mt-6 space-y-4">
               {isHost ? (
                 <>
-                  <Button variant="secondary" className="w-full h-14" disabled>
+                  <Button
+                    variant="secondary"
+                    className="w-full h-14"
+                    disabled={!canAddBot}
+                    loading={isAddingBot}
+                    onClick={handleAddBot}
+                  >
                     <Bot size={20} className="shrink-0 mr-1" />
                     <span className="text-sm tracking-[0.32em] font-black uppercase">Add Bot</span>
                   </Button>

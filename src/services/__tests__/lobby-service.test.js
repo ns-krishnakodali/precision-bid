@@ -1,11 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { get, onValue, push, ref, serverTimestamp, set, update } from 'firebase/database';
+import {
+  get,
+  onValue,
+  push,
+  ref,
+  runTransaction,
+  serverTimestamp,
+  set,
+  update,
+} from 'firebase/database';
 
 import { gameService } from '../game-service';
 import { lobbyService } from '../lobby-service';
 
-import { GAME_TYPE, LOBBY_STATUS, MAX_ATTEMPTS, SPADES_VARIANT } from '../../constants';
+import {
+  BOT_NAME_LIMIT,
+  BOT_NAME_PREFIX,
+  BOT_PIN,
+  GAME_TYPE,
+  LOBBY_STATUS,
+  MAX_ATTEMPTS,
+  SPADES_VARIANT,
+} from '../../constants';
 import { db } from '../../firebase';
 import { generateUniqueCode } from '../../utils';
 
@@ -14,6 +31,7 @@ vi.mock('firebase/database', () => ({
   onValue: vi.fn(),
   push: vi.fn(),
   ref: vi.fn((database, path = '') => ({ database, path })),
+  runTransaction: vi.fn(),
   serverTimestamp: vi.fn(() => 'SERVER_TIMESTAMP'),
   set: vi.fn(),
   update: vi.fn(),
@@ -38,6 +56,9 @@ const snapshot = (value, exists = value !== undefined && value !== null) => ({
   val: vi.fn(() => value),
 });
 
+const deepClone = (value) =>
+  typeof value === 'undefined' ? undefined : JSON.parse(JSON.stringify(value));
+
 const createLobby = (overrides = {}) => ({
   gameCode: 'PLAY01',
   gameType: GAME_TYPE.SPADES,
@@ -49,6 +70,19 @@ const createLobby = (overrides = {}) => ({
   status: LOBBY_STATUS.WAITING,
   ...overrides,
 });
+
+const useTransactionData = (initialData) => {
+  let data = deepClone(initialData);
+
+  runTransaction.mockImplementation(async (pathRef, updater) => {
+    data = updater(data);
+    return { committed: true, snapshot: { val: () => data } };
+  });
+
+  return {
+    getData: () => data,
+  };
+};
 
 describe('lobbyService', () => {
   beforeEach(() => {
@@ -125,6 +159,36 @@ describe('lobbyService', () => {
       expect(serverTimestamp).toHaveBeenCalledTimes(1);
     });
 
+    it('rejects reserved bot names before allocating a lobby', async () => {
+      await expect(
+        lobbyService.createGameSession(
+          ` ${BOT_NAME_PREFIX} ${BOT_NAME_LIMIT} `,
+          '1111',
+          GAME_TYPE.SPADES
+        )
+      ).rejects.toThrow(
+        `${BOT_NAME_PREFIX} 1 through ${BOT_NAME_PREFIX} ${BOT_NAME_LIMIT} are reserved names.`
+      );
+
+      expect(push).not.toHaveBeenCalled();
+      expect(set).not.toHaveBeenCalled();
+    });
+
+    it('allows player names outside the reserved bot range', async () => {
+      get.mockResolvedValue(snapshot(null, false));
+
+      await expect(
+        lobbyService.createGameSession(
+          `${BOT_NAME_PREFIX} ${BOT_NAME_LIMIT + 1}`,
+          '1111',
+          GAME_TYPE.SPADES
+        )
+      ).resolves.toEqual({
+        gameCode: 'GAME01',
+        lobbyId: 'lobby-1',
+      });
+    });
+
     it('skips duplicate generated game codes before creating a lobby', async () => {
       generateUniqueCode.mockReturnValueOnce('USED01').mockReturnValueOnce('FREE02');
       get
@@ -190,6 +254,18 @@ describe('lobbyService', () => {
           },
         }
       );
+    });
+
+    it('rejects reserved bot names before looking up a lobby', async () => {
+      await expect(
+        lobbyService.joinGameSession('PLAY01', ` ${BOT_NAME_PREFIX} ${BOT_NAME_LIMIT} `, '3333')
+      ).resolves.toEqual({
+        error: `${BOT_NAME_PREFIX} 1 through ${BOT_NAME_PREFIX} ${BOT_NAME_LIMIT} are reserved names.`,
+        lobbyId: '',
+      });
+
+      expect(get).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
     });
 
     it('allows an existing player to rejoin with the matching pin', async () => {
@@ -285,7 +361,7 @@ describe('lobbyService', () => {
       );
     });
 
-    it('propagates Firebase update failures', async () => {
+    it('propagates Firebase transaction failures', async () => {
       update.mockRejectedValueOnce(new Error('variant update failed'));
 
       await expect(lobbyService.updateVariant('lobby-1', SPADES_VARIANT.CLASSIC)).rejects.toThrow(
@@ -295,21 +371,165 @@ describe('lobbyService', () => {
   });
 
   describe('removePlayer', () => {
-    it('removes a player by writing null at their player key', async () => {
+    it('removes a non-host player while preserving the current host', async () => {
+      const transaction = useTransactionData(createLobby());
+
       await lobbyService.removePlayer('lobby-1', 'Player2');
 
-      expect(update).toHaveBeenCalledWith(
-        { database: db, path: 'lobby/lobby-1/players' },
-        { Player2: null }
+      const data = transaction.getData();
+      expect(ref).toHaveBeenCalledWith(db, 'lobby/lobby-1');
+      expect(data.host).toBe('Player1');
+      expect(data.players.Player1.isHost).toBe(true);
+      expect(data.players.Player2).toBeUndefined();
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('assigns host ownership to the next joined human player when the host leaves', async () => {
+      const transaction = useTransactionData(
+        createLobby({
+          players: {
+            Player1: { isHost: true, joinedAt: 1000, name: 'Player1', pin: '1111' },
+            [`${BOT_NAME_PREFIX} 1`]: {
+              isBot: true,
+              isHost: false,
+              joinedAt: 1001,
+              name: `${BOT_NAME_PREFIX} 1`,
+              pin: BOT_PIN,
+            },
+            Player3: { isHost: false, joinedAt: 1002, name: 'Player3', pin: '3333' },
+            Player2: { isHost: false, joinedAt: 1003, name: 'Player2', pin: '2222' },
+          },
+        })
       );
+
+      await lobbyService.removePlayer('lobby-1', 'Player1');
+
+      const data = transaction.getData();
+      expect(data.host).toBe('Player3');
+      expect(data.players.Player1).toBeUndefined();
+      expect(data.players.Player3.isHost).toBe(true);
+      expect(data.players.Player2.isHost).toBe(false);
+      expect(data.players[`${BOT_NAME_PREFIX} 1`].isHost).toBe(false);
+    });
+
+    it('clears host ownership when no human players remain', async () => {
+      const transaction = useTransactionData(
+        createLobby({
+          players: {
+            Player1: { isHost: true, joinedAt: 1000, name: 'Player1', pin: '1111' },
+            [`${BOT_NAME_PREFIX} 1`]: {
+              isBot: true,
+              isHost: false,
+              joinedAt: 1001,
+              name: `${BOT_NAME_PREFIX} 1`,
+              pin: BOT_PIN,
+            },
+          },
+        })
+      );
+
+      await lobbyService.removePlayer('lobby-1', 'Player1');
+
+      const data = transaction.getData();
+      expect(data.host).toBe('');
+      expect(data.players.Player1).toBeUndefined();
+      expect(data.players[`${BOT_NAME_PREFIX} 1`].isHost).toBe(false);
+    });
+
+    it('marks the lobby cancelled when the last player leaves', async () => {
+      const transaction = useTransactionData(
+        createLobby({
+          players: {
+            Player1: { isHost: true, joinedAt: 1000, name: 'Player1', pin: '1111' },
+          },
+        })
+      );
+
+      await lobbyService.removePlayer('lobby-1', 'Player1');
+
+      const data = transaction.getData();
+      expect(data.host).toBe('');
+      expect(data.players).toEqual({});
+      expect(data.status).toBe(LOBBY_STATUS.CANCELLED);
+    });
+
+    it('handles missing lobby data and missing players without changing state', async () => {
+      const missingLobbyTransaction = useTransactionData(null);
+      await lobbyService.removePlayer('lobby-1', 'Player1');
+      expect(missingLobbyTransaction.getData()).toBeNull();
+
+      const missingPlayerTransaction = useTransactionData(createLobby());
+      await lobbyService.removePlayer('lobby-1', 'MissingPlayer');
+      expect(missingPlayerTransaction.getData()).toEqual(createLobby());
     });
 
     it('propagates Firebase update failures', async () => {
-      update.mockRejectedValueOnce(new Error('remove failed'));
+      runTransaction.mockRejectedValueOnce(new Error('remove failed'));
 
       await expect(lobbyService.removePlayer('lobby-1', 'Player2')).rejects.toThrow(
         'remove failed'
       );
+    });
+  });
+
+  describe('addBot', () => {
+    it('adds the next available bot player in a waiting lobby', async () => {
+      vi.spyOn(Date, 'now').mockReturnValue(4000);
+      const transaction = useTransactionData(
+        createLobby({
+          players: {
+            Player1: { isHost: true, joinedAt: 1000, name: 'Player1', pin: '1111' },
+            [`${BOT_NAME_PREFIX} 1`]: {
+              isBot: true,
+              isHost: false,
+              joinedAt: 3000,
+              name: `${BOT_NAME_PREFIX} 1`,
+              pin: BOT_PIN,
+            },
+          },
+        })
+      );
+
+      await expect(lobbyService.addBot('lobby-1')).resolves.toBe(`${BOT_NAME_PREFIX} 2`);
+
+      expect(ref).toHaveBeenCalledWith(db, 'lobby/lobby-1');
+      expect(transaction.getData().players[`${BOT_NAME_PREFIX} 2`]).toEqual({
+        isBot: true,
+        isHost: false,
+        joinedAt: 4000,
+        name: `${BOT_NAME_PREFIX} 2`,
+        pin: BOT_PIN,
+      });
+    });
+
+    it('does not add bots after start, at capacity, or for missing lobbies', async () => {
+      const inGameTransaction = useTransactionData(createLobby({ status: LOBBY_STATUS.IN_GAME }));
+      await expect(lobbyService.addBot('lobby-1')).resolves.toBe('');
+      expect(Object.keys(inGameTransaction.getData().players)).toHaveLength(2);
+
+      const fullTransaction = useTransactionData(
+        createLobby({
+          players: {
+            Player1: { pin: '1111' },
+            Player2: { pin: '2222' },
+            Player3: { pin: '3333' },
+            Player4: { pin: '4444' },
+          },
+        })
+      );
+      await expect(lobbyService.addBot('lobby-1')).resolves.toBe('');
+      expect(Object.keys(fullTransaction.getData().players)).toHaveLength(4);
+
+      const missingTransaction = useTransactionData(null);
+      await expect(lobbyService.addBot('lobby-1')).resolves.toBe('');
+      expect(missingTransaction.getData()).toBeNull();
+    });
+
+    it('throws for missing ids and propagates Firebase failures', async () => {
+      await expect(lobbyService.addBot('')).rejects.toThrow('Missing lobbyId.');
+
+      runTransaction.mockRejectedValueOnce(new Error('bot add failed'));
+      await expect(lobbyService.addBot('lobby-1')).rejects.toThrow('bot add failed');
     });
   });
 

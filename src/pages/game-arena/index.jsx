@@ -6,6 +6,7 @@ import { Toaster } from '../../components';
 import {
   BID_WHIST_VARIANT,
   BIDDING,
+  BOT_ACTION_DELAY,
   CARD_SUITS,
   CLUB,
   DIAMOND,
@@ -221,18 +222,6 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
 
   const tableRef = useRef(null);
 
-  const winnerNames = gameData.winnerNames ?? [];
-
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      if (winnerNames.length === 0) {
-        tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    });
-
-    return () => cancelAnimationFrame(frame);
-  }, [winnerNames.length]);
-
   const currentRound = gameData.rounds?.at(-1);
 
   const players = useMemo(
@@ -242,6 +231,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
         score: player.score,
         accumulated: player.accumulated,
         bids: currentRound?.players?.[player.name].bids,
+        isBot: player.isBot,
         wins: currentRound?.players?.[player.name].wins,
       })),
     [gameData.players, currentRound]
@@ -304,6 +294,8 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
 
   // Variables
   const currentPlayer = players[gameData?.currentPlayerIdx ?? 0]?.name;
+  const currentPlayerDetails = gameData.players.find((player) => player.name === currentPlayer);
+  const isHost = gameData.host === playerName;
   const isPlayerTurn = currentPlayer === playerName;
   const leadSuit =
     Number(currentRound?.currentTurn ?? 0) - 1 >= 0
@@ -318,7 +310,40 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
     Number.isInteger(Number(bidCount)) &&
     Number(bidCount) >= 0 &&
     Number(bidCount) <= playerHand.length;
+  const winnerNames = gameData.winnerNames ?? [];
   const winningPlayers = players.filter((player) => winnerNames.includes(player.name));
+
+  useEffect(() => {
+    if (!isHost || !currentPlayerDetails?.isBot || winnerNames.length > 0) return undefined;
+
+    const botActionTimeout = setTimeout(() => {
+      gameService.processBotAction(lobbyId, playerName).catch((botErr) => {
+        console.error('Bot action error:', botErr);
+      });
+    }, BOT_ACTION_DELAY);
+
+    return () => clearTimeout(botActionTimeout);
+  }, [
+    currentPlayerDetails?.isBot,
+    currentPlayer,
+    currentRound,
+    gameData.roundNumber,
+    gameData.roundStatus,
+    isHost,
+    lobbyId,
+    playerName,
+    winnerNames.length,
+  ]);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      if (winnerNames.length === 0) {
+        tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [winnerNames.length]);
 
   // Handler methods
   const handleUserBid = async () => {
@@ -697,9 +722,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                           </div>
                           <div className="shrink-0 text-right">
                             <p
-                              className={`text-3xl font-black leading-none tabular-nums ${
-                                idx === 0 ? 'text-cyan-100' : 'text-white'
-                              }`}
+                              className={`text-3xl font-black leading-none tabular-nums ${idx === 0 ? 'text-cyan-100' : 'text-white'}`}
                             >
                               {team.score}
                             </p>
@@ -1265,7 +1288,9 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                         Final Score
                       </span>
                       <span className="text-sm font-black text-white tabular-nums">
-                        {winningPlayers[0]?.score}
+                        {isSpadesGame
+                          ? (winningPlayers ?? []).reduce((acc, curr) => acc + curr?.score, 0)
+                          : winningPlayers[0]?.score}
                       </span>
                     </div>
                     <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/45 px-4 py-2">

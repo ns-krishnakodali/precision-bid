@@ -1,8 +1,20 @@
-import { get, onValue, push, ref, serverTimestamp, set, update } from 'firebase/database';
+import {
+  get,
+  onValue,
+  push,
+  ref,
+  runTransaction,
+  serverTimestamp,
+  set,
+  update,
+} from 'firebase/database';
 
 import {
   BID_WHIST_VARIANT,
   BIDDING,
+  BOT_NAME_LIMIT,
+  BOT_NAME_PREFIX,
+  BOT_PIN,
   GAME_CONFIG,
   GAME_ROUNDS,
   GAME_TYPE,
@@ -12,6 +24,14 @@ import {
 import { db } from '../firebase';
 import { generateUniqueCode } from '../utils';
 import { gameService } from './game-service';
+
+const isReservedBotName = (playerName) => {
+  for (let botIdx = 1; botIdx <= BOT_NAME_LIMIT; botIdx++) {
+    if (String(playerName ?? '').trim() === `${BOT_NAME_PREFIX} ${botIdx}`) return true;
+  }
+
+  return false;
+};
 
 const getLobbyIdByCode = async (gameCode) => {
   const normalizedCode = String(gameCode ?? '')
@@ -24,6 +44,11 @@ const getLobbyIdByCode = async (gameCode) => {
 };
 
 const createGameSession = async (playerName, playerPin, gameType) => {
+  if (isReservedBotName(playerName))
+    throw new Error(
+      `${BOT_NAME_PREFIX} 1 through ${BOT_NAME_PREFIX} ${BOT_NAME_LIMIT} are reserved names.`
+    );
+
   const lobbyId = push(ref(db, 'lobby')).key;
   if (!lobbyId) throw new Error('Failed to allocate lobby id.');
 
@@ -63,6 +88,12 @@ const createGameSession = async (playerName, playerPin, gameType) => {
 };
 
 const joinGameSession = async (gameCode, playerName, playerPin) => {
+  if (isReservedBotName(playerName))
+    return {
+      error: `${BOT_NAME_PREFIX} 1 through ${BOT_NAME_PREFIX} ${BOT_NAME_LIMIT} are reserved names.`,
+      lobbyId: '',
+    };
+
   const normalizedCode = String(gameCode ?? '')
     .trim()
     .toUpperCase();
@@ -81,8 +112,11 @@ const joinGameSession = async (gameCode, playerName, playerPin) => {
     if (Object.keys(players).length >= (GAME_CONFIG[lobbyData.gameType]?.maxPlayers ?? 4)) {
       return { error: 'Lobby is full.', lobbyId: '' };
     }
-    if (lobbyData.status !== LOBBY_STATUS.WAITING) {
+    if (lobbyData.status === LOBBY_STATUS.IN_GAME) {
       return { error: 'Game has already started.', lobbyId: '' };
+    }
+    if (lobbyData.status === LOBBY_STATUS.CANCELLED) {
+      return { error: 'Game has been cancelled.', lobbyId: '' };
     }
 
     await update(ref(db, `lobby/${lobbyId}/players`), {
@@ -105,7 +139,73 @@ const updateVariant = async (lobbyId, variant) => {
 };
 
 const removePlayer = async (lobbyId, playerName) => {
-  await update(ref(db, `lobby/${lobbyId}/players`), { [playerName]: null });
+  await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
+    if (!lobbyData?.players?.[playerName]) return lobbyData;
+
+    const wasHost = lobbyData.host === playerName || lobbyData.players[playerName].isHost;
+    const remainingPlayerEntries = Object.entries(lobbyData.players)
+      .filter(([name]) => name !== playerName)
+      .sort(
+        ([name1, playerDetails1], [name2, playerDetails2]) =>
+          Number(playerDetails1?.joinedAt ?? 0) - Number(playerDetails2?.joinedAt ?? 0) ||
+          name1.localeCompare(name2)
+      );
+
+    delete lobbyData.players[playerName];
+
+    if (Object.keys(lobbyData.players).length === 0) {
+      lobbyData.host = '';
+      lobbyData.status = LOBBY_STATUS.CANCELLED;
+      return lobbyData;
+    }
+
+    if (wasHost) {
+      const [nextHostName] =
+        remainingPlayerEntries.find(([, playerDetails]) => !playerDetails?.isBot) ?? [];
+
+      lobbyData.host = nextHostName ?? '';
+      remainingPlayerEntries.forEach(([name]) => {
+        lobbyData.players[name].isHost = name === nextHostName;
+      });
+    }
+
+    return lobbyData;
+  });
+};
+
+const addBot = async (lobbyId) => {
+  if (!lobbyId) throw new Error('Missing lobbyId.');
+
+  let botName = '';
+  const joinedAt = Date.now();
+
+  await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
+    if (!lobbyData) return lobbyData;
+    if (lobbyData.status !== LOBBY_STATUS.WAITING) return lobbyData;
+
+    const players = lobbyData.players ?? {};
+    const maxPlayers = GAME_CONFIG[lobbyData.gameType]?.maxPlayers ?? 4;
+    if (Object.keys(players).length >= maxPlayers) return lobbyData;
+
+    let botIdx = 1;
+    while (players[`${BOT_NAME_PREFIX} ${botIdx}`]) botIdx += 1;
+
+    botName = `${BOT_NAME_PREFIX} ${botIdx}`;
+    lobbyData.players = {
+      ...players,
+      [botName]: {
+        isBot: true,
+        isHost: false,
+        joinedAt,
+        name: botName,
+        pin: BOT_PIN,
+      },
+    };
+
+    return lobbyData;
+  });
+
+  return botName;
 };
 
 const startGame = async (lobbyId, variant) => {
@@ -163,6 +263,7 @@ const subscribeToLobby = ({ lobbyId, onChange, onError }) => {
 };
 
 export const lobbyService = {
+  addBot,
   createGameSession,
   getLobbyIdByCode,
   joinGameSession,

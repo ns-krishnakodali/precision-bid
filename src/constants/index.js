@@ -14,6 +14,11 @@ export const MAX_ORDER = 14;
 export const MAX_ACCUMULATED = 5;
 export const POINTS = 10;
 
+export const BOT_ACTION_DELAY = 650;
+export const BOT_NAME_LIMIT = 7;
+export const BOT_NAME_PREFIX = 'Bot';
+export const BOT_PIN = '1234';
+
 export const BIDDING = 'Bidding';
 export const GAME_STATUS = 'Game Status';
 export const NEW_ROUND_STATUS = 'New Round';
