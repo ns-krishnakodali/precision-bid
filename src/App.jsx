@@ -205,6 +205,7 @@ const App = () => {
       )}
       {view === GAME_STATE.LOBBY && (
         <LobbyPage
+          lobbyId={lobbyId}
           gameData={gameData}
           playerName={playerName}
           onVariantChange={handleUpdateVariant}

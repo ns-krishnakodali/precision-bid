@@ -1,8 +1,8 @@
 // Values
+export const SPADE = 'spade';
 export const HEART = 'heart';
 export const DIAMOND = 'diamond';
 export const CLUB = 'club';
-export const SPADE = 'spade';
 export const JOKER = 'joker';
 
 export const BIG_JOKER = 'BJ';
@@ -10,15 +10,16 @@ export const SMALL_JOKER = 'SJ';
 
 export const MAX_ATTEMPTS = 10;
 export const MAX_ROUNDS = 13;
+export const MAX_ORDER = 14;
 export const MAX_ACCUMULATED = 5;
-export const LOBBY_DETAILS = 'LOBBY_DETAILS';
 
 export const BIDDING = 'Bidding';
 export const GAME_STATUS = 'Game Status';
 export const NEW_ROUND_STATUS = 'New Round';
-export const SELECT_TRUMP = 'Selecting Trump Suit';
-
+export const SELECT_TRUMP_STATUS = 'Selecting Suit';
 export const ROUND_START_STATUS = 'Starting a new round';
+
+export const LOBBY_DETAILS = 'LOBBY_DETAILS';
 
 // Objects
 export const GAME_STATE = {
@@ -45,9 +46,15 @@ export const SPADES_VARIANT = {
 };
 
 export const BID_WHIST_VARIANT = {
-  UPTOWN: 'Uptown (Oh Hell)',
-  DOWNTOWN: 'Downtown (Oh Hell)',
-  NO_TRUMP: ' No Trump (Classic)',
+  UPTOWN: 'Uptown',
+  DOWNTOWN: 'Downtown',
+  NO_TRUMP: ' No Trump',
+};
+
+export const VARIANT_VERSIONS = {
+  [BID_WHIST_VARIANT.UPTOWN]: 'Oh Hell',
+  [BID_WHIST_VARIANT.DOWNTOWN]: 'Oh Hell',
+  [BID_WHIST_VARIANT.NO_TRUMP]: 'Classic',
 };
 
 export const GAME_CONFIG = {
@@ -70,10 +77,10 @@ export const GAME_ROUNDS = {
 };
 
 export const SUITE_META = {
-  [HEART]: { symbol: '\u2665', color: 'text-rose-500' },
-  [DIAMOND]: { symbol: '\u2666', color: 'text-rose-500' },
-  [CLUB]: { symbol: '\u2663', color: 'text-slate-800' },
-  [SPADE]: { symbol: '\u2660', color: 'text-slate-800' },
+  [SPADE]: { symbol: '\u2660', color: 'text-slate-900' },
+  [HEART]: { symbol: '\u2665', color: 'text-rose-600' },
+  [DIAMOND]: { symbol: '\u2666', color: 'text-rose-600' },
+  [CLUB]: { symbol: '\u2663', color: 'text-slate-900' },
   [JOKER]: { symbol: '\u2605', color: 'text-violet-600' },
 };
 
@@ -91,11 +98,13 @@ export const CARDS_ORDER = {
   Q: 11,
   K: 12,
   A: 13,
+  SJ: 14,
+  BJ: 15,
 };
 
 // Arrays
 export const CARD_VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-export const CARD_SUITS = ['spade', 'heart', 'diamond', 'club'];
+export const CARD_SUITS = [SPADE, HEART, DIAMOND, CLUB];
 
 export const LOADING_MESSAGES = [
   'Shuffling cards and preparing the deck',

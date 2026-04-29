@@ -104,6 +104,10 @@ const updateVariant = async (lobbyId, variant) => {
   await update(ref(db, `lobby/${lobbyId}`), { variant });
 };
 
+const removePlayer = async (lobbyId, playerName) => {
+  await update(ref(db, `lobby/${lobbyId}/players`), { [playerName]: null });
+};
+
 const startGame = async (lobbyId, variant) => {
   const snapshot = await get(ref(db, `lobby/${lobbyId}`));
   if (!snapshot.exists()) throw new Error('Game session not found.');
@@ -162,6 +166,7 @@ export const lobbyService = {
   createGameSession,
   getLobbyIdByCode,
   joinGameSession,
+  removePlayer,
   startGame,
   subscribeToLobby,
   updateVariant,

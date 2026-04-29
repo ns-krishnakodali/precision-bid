@@ -16,7 +16,14 @@ import {
   Bot,
 } from 'lucide-react';
 
-import { BID_WHIST_VARIANT, GAME_CONFIG, GAME_TYPE, SPADES_VARIANT } from '../../constants';
+import {
+  BID_WHIST_VARIANT,
+  GAME_CONFIG,
+  GAME_TYPE,
+  SPADES_VARIANT,
+  VARIANT_VERSIONS,
+} from '../../constants';
+import { lobbyService } from '../../services';
 
 const Button = ({
   children,
@@ -48,7 +55,14 @@ const Button = ({
   );
 };
 
-export const LobbyPage = ({ gameData, playerName, onLeave, onStartGame, onVariantChange }) => {
+export const LobbyPage = ({
+  lobbyId,
+  gameData,
+  playerName,
+  onLeave,
+  onStartGame,
+  onVariantChange,
+}) => {
   const [isCodeCopied, setIsCodeCopied] = useState(false);
 
   const codeCopiedTimeoutRef = useRef(null);
@@ -117,18 +131,27 @@ export const LobbyPage = ({ gameData, playerName, onLeave, onStartGame, onVarian
     onVariantChange(gameVariant);
   };
 
+  const handleLeaveGame = async () => {
+    try {
+      await lobbyService.removePlayer(lobbyId, playerName);
+      onLeave();
+    } catch (err) {
+      console.error('Leave game error:', err);
+    }
+  };
+
   return (
     <div className="min-h-screen text-white p-6 md:p-12 flex items-center justify-center relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-cyan-500 to-transparent opacity-50" />
       <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-12 gap-8 items-start relative z-10">
-        <div className="md:col-span-7 space-y-6">
-          <div className="flex items-end justify-between px-2">
+        <div className="md:col-span-7 space-y-4 md:space-y-6">
+          <div className="flex flex-col sm:flex-row items-center sm:items-end justify-between gap-3 sm:gap-0 px-2 py-4 sm:py-0">
             <div>
               <h2 className="text-3xl font-black flex items-center gap-3">
                 <Users className="text-cyan-400" size={32} />
                 Waiting Room
               </h2>
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1.5">
+              <p className="text-xs text-center sm:text-start text-slate-500 font-bold uppercase tracking-widest mt-1.5">
                 Synchronizing Players
               </p>
             </div>
@@ -258,7 +281,10 @@ export const LobbyPage = ({ gameData, playerName, onLeave, onStartGame, onVarian
                           : 'bg-slate-950/50 border-white/5 text-slate-500 hover:border-white/20'
                       }`}
                     >
-                      <span className="capitalize font-black tracking-wide">{gameVariant}</span>
+                      <span className="capitalize font-black tracking-wide">
+                        {gameVariant}
+                        {VARIANT_VERSIONS[gameVariant] && ` (${VARIANT_VERSIONS[gameVariant]})`}
+                      </span>
                       {selectedVariant === gameVariant ? (
                         <div className="bg-white/20 p-1 rounded-md">
                           <ShieldCheck size={16} />
@@ -304,7 +330,7 @@ export const LobbyPage = ({ gameData, playerName, onLeave, onStartGame, onVarian
                 </div>
               )}
               <button
-                onClick={onLeave}
+                onClick={handleLeaveGame}
                 className="w-full text-xs font-black text-slate-600 hover:text-rose-500 transition-colors uppercase tracking-[0.3em] flex items-center
                   justify-center gap-2"
               >

@@ -12,7 +12,7 @@ import {
   GAME_TYPE,
   HEART,
   JOKER,
-  SELECT_TRUMP,
+  SELECT_TRUMP_STATUS,
   SPADE,
   SPADES_VARIANT,
   SUITE_META,
@@ -215,15 +215,19 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
 
   const tableRef = useRef(null);
 
+  const winnerNames = gameData.winnerNames ?? [];
+
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
-      if (!gameData?.winnerName) {
+      if (winnerNames.length === 0) {
         tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [gameData?.winnerName]);
+  }, [winnerNames.length]);
+
+  const currentRound = gameData.rounds?.at(-1);
 
   const players = useMemo(
     () =>
@@ -231,10 +235,10 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
         name: player.name,
         score: player.score,
         accumulated: player.accumulated,
-        bids: gameData.rounds?.at(-1).players?.[player.name].bids,
-        wins: gameData.rounds?.at(-1).players?.[player.name].wins,
+        bids: currentRound?.players?.[player.name].bids,
+        wins: currentRound?.players?.[player.name].wins,
       })),
-    [gameData.players, gameData.rounds]
+    [gameData.players, currentRound]
   );
 
   const playerHand = useMemo(
@@ -245,20 +249,27 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
   const playedCards = useMemo(
     () =>
       Object.fromEntries(
-        Object.entries(gameData.rounds?.at(-1)?.players ?? {}).map(
-          ([playerName, playerDetails]) => [
-            playerName,
-            playerDetails.played?.[Number(gameData.rounds?.at(-1)?.currentTurn ?? 1) - 1] ?? {},
-          ]
-        )
+        Object.entries(currentRound?.players ?? {}).map(([playerName, playerDetails]) => [
+          playerName,
+          playerDetails.played?.[Number(currentRound?.currentTurn ?? 1) - 1] ?? {},
+        ])
       ),
-    [gameData.rounds]
+    [currentRound]
+  );
+
+  const sortedPlayers = useMemo(
+    () =>
+      [...players].sort(
+        (player1, player2) =>
+          (player2.score ?? 0) - (player1.score ?? 0) ||
+          (player2.accumulated ?? 0) - (player1.accumulated ?? 0)
+      ),
+    [players]
   );
 
   // Variables
   const currentPlayer = players[gameData?.currentPlayerIdx ?? 0]?.name;
   const isPlayerTurn = currentPlayer === playerName;
-  const currentRound = gameData.rounds?.at(-1);
   const leadSuit =
     Number(currentRound?.currentTurn ?? 0) - 1 >= 0
       ? (currentRound.players?.[players[currentRound?.startPlayerIdx ?? -1]?.name]?.played?.[
@@ -272,6 +283,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
     Number.isInteger(Number(bidCount)) &&
     Number(bidCount) >= 0 &&
     Number(bidCount) <= playerHand.length;
+  const winningPlayers = players.filter((player) => winnerNames.includes(player.name));
 
   // Handler methods
   const handleUserBid = async () => {
@@ -283,7 +295,8 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
       return;
     }
 
-    const isLastBidder = gameData?.currentPlayerIdx === players.length - 1;
+    const isLastBidder =
+      (gameData?.currentPlayerIdx + 1) % players.length === currentRound.startPlayerIdx;
 
     await gameService.updateRoundState(lobbyId, playerName, {}, Number(bidCount), !isLastBidder);
     if (isLastBidder)
@@ -298,6 +311,10 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
       );
   };
 
+  const handleRoundTrump = async (suit) => {
+    await gameService.updateRoundTrump(lobbyId, suit);
+  };
+
   const handleCardPlay = async (cardDetails) => {
     if (Object.keys(cardDetails ?? {}).length === 0) {
       setToast({
@@ -307,11 +324,11 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
       return;
     }
 
-    const currentPlayerIdx = gameData?.currentPlayerIdx;
+    const isLastPlay =
+      (gameData?.currentPlayerIdx + 1) % players.length === currentRound.startPlayerIdx;
 
-    await gameService.updateRoundState(lobbyId, playerName, cardDetails, undefined, true);
-
-    if ((currentPlayerIdx + 1) % players.length === gameData.rounds?.at(-1)?.startPlayerIdx) {
+    await gameService.updateRoundState(lobbyId, playerName, cardDetails, undefined, !isLastPlay);
+    if (isLastPlay) {
       await gameService.updateTurnWinner(lobbyId);
     }
   };
@@ -352,7 +369,67 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
           </div>
         </header>
         <Border />
-        <main className="mt-4 flex flex-col items-center">
+        <div className="mt-4 flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+            <div
+              className="inline-flex h-8 items-center rounded-full border border-white/10 bg-white/5 px-3 leading-none shadow-[0_10px_30px_rgba(0,0,0,0.2)]
+                backdrop-blur-xl"
+            >
+              <span className="text-[9px] font-black uppercase leading-none tracking-[0.24em] text-slate-500">
+                Game
+              </span>
+              <span className="ml-1.5 max-w-24 truncate text-xs font-black leading-none tracking-wider text-slate-100 sm:max-w-32">
+                {gameData.gameType}
+              </span>
+            </div>
+            <div
+              className="inline-flex h-8 items-center rounded-full border border-white/10 bg-white/5 px-3 leading-none shadow-[0_10px_30px_rgba(0,0,0,0.2)]
+                backdrop-blur-xl"
+            >
+              <span className="text-[9px] font-black uppercase leading-none tracking-[0.24em] text-slate-500">
+                Variant
+              </span>
+              <span className="ml-1.5 max-w-24 truncate text-xs font-black leading-none tracking-wider text-slate-100 sm:max-w-32">
+                {gameData.variant}
+              </span>
+            </div>
+            {currentRound?.trumpSuit && (
+              <div
+                className="inline-flex h-8 items-center rounded-full border border-white/10 bg-white/5 px-3 leading-none shadow-[0_10px_30px_rgba(0,0,0,0.2)]
+                backdrop-blur-xl"
+              >
+                <span className="text-[9px] font-black uppercase leading-none tracking-[0.24em] text-slate-500">
+                  Trump
+                </span>
+                <span className="ml-1.5 max-w-24 truncate text-xs font-black leading-none tracking-wider text-slate-100 capitalize sm:max-w-32">
+                  {currentRound.trumpSuit}
+                </span>
+                <span
+                  className={`ml-1.5 text-sm leading-none ${
+                    SUITE_META[currentRound.trumpSuit]?.color ?? 'text-slate-100'
+                  }`}
+                >
+                  {SUITE_META[currentRound.trumpSuit]?.symbol ?? ''}
+                </span>
+              </div>
+            )}
+          </div>
+          <div
+            className="inline-flex h-8 items-center rounded-full border border-cyan-400/20 bg-cyan-400/8 px-3 leading-none shadow-[0_10px_30px_rgba(0,0,0,0.24)]
+              backdrop-blur-xl"
+          >
+            <span className="text-[9px] font-black uppercase leading-none tracking-[0.24em] text-cyan-300/70">
+              Round
+            </span>
+            <span
+              className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-cyan-400/10 px-1.5 text-xs font-black leading-none tabular-nums
+            text-cyan-100"
+            >
+              {gameData.roundNumber}
+            </span>
+          </div>
+        </div>
+        <main className="mt-2 flex flex-col items-center">
           <div className="w-full max-w-7xl">
             <div
               ref={tableRef}
@@ -375,8 +452,8 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                   <div className="absolute inset-[3%] rounded-[999px] border border-dashed border-white/10" />
                 </div>
               </div>
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-                <div className="relative w-52">
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
+                <div className="relative w-53">
                   <div className="absolute -inset-2 rounded-full bg-cyan-500/20 blur-xl animate-pulse" />
                   <div className="relative rounded-full p-0.5 overflow-hidden">
                     <div
@@ -450,10 +527,10 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                   <div className="min-h-28 flex items-center justify-center text-center px-4">
                     <div>
                       <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.35em]">
-                        Hand Empty
+                        Empty Hand
                       </p>
                       <p className="mt-2 text-sm sm:text-base font-black tracking-normal text-slate-200/90">
-                        You are done with this round
+                        All cards played this round
                       </p>
                     </div>
                   </div>
@@ -464,14 +541,20 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                         key={idx}
                         type="button"
                         disabled={
+                          gameData.roundStatus === BIDDING ||
                           !isPlayerTurn ||
                           (restrictedSuit !== '' && cardDetails.suit !== restrictedSuit)
                         }
+                        className="rounded-xl motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-300 transition-all
+                          duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2
+                        focus-visible:ring-offset-slate-950 ring-2 ring-cyan-400/35 shadow-[0_16px_35px_rgba(0,0,0,0.25)] enabled:hover:-translate-y-1
+                          enabled:active:scale-[0.99] enabled:hover:ring-cyan-300/75 enabled:hover:shadow-[0_0_28px_rgba(6,182,212,0.18)] disabled:cursor-not-allowed
+                          disabled:opacity-25 disabled:ring-0 disabled:shadow-none"
+                        style={{
+                          animationDelay: `${idx * 45}ms`,
+                          animationFillMode: 'both',
+                        }}
                         onClick={() => handleCardPlay(cardDetails)}
-                        className="rounded-xl transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70
-                          focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ring-2 ring-cyan-400/35 shadow-[0_16px_35px_rgba(0,0,0,0.25)]
-                          enabled:hover:-translate-y-1 enabled:active:scale-[0.99] enabled:hover:ring-cyan-300/75 enabled:hover:shadow-[0_0_28px_rgba(6,182,212,0.18)]
-                          disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale disabled:saturate-50 disabled:ring-0 disabled:shadow-none"
                       >
                         <PlayingCard
                           card={cardDetails}
@@ -488,57 +571,59 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
         </main>
       </div>
       {openScorecardModal && (
-        <div className="fixed inset-0 z-90 flex items-start sm:items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-90 flex items-start justify-center overflow-y-auto p-4 sm:items-center sm:p-6">
           <button
             onClick={() => setOpenScoreCardModal(false)}
             className="absolute inset-0 bg-[#020617]/80 backdrop-blur-md"
             aria-label="Close scorecard"
           />
           <div
-            className="w-full max-w-xl relative z-10 bg-slate-900/40 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] shadow-[0_30px_120px_rgba(0,0,0,0.65)]
-              overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3rem)]"
+            className="relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-[2.5rem] border border-white/5
+            bg-slate-900/40 shadow-[0_30px_120px_rgba(0,0,0,0.65)] backdrop-blur-3xl animate-in fade-in zoom-in-95 duration-200 sm:max-h-[calc(100dvh-3rem)]"
             role="dialog"
             aria-modal="true"
             aria-label="Scorecard"
           >
-            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.12)_0%,transparent_55%)]" />
-            <div className="relative z-10 p-6 sm:p-8 flex flex-col h-full min-h-0">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.12)_0%,transparent_55%)]" />
+            <div className="relative z-10 flex h-full min-h-0 flex-col p-6 sm:p-8">
               <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">
+                <div className="min-w-0">
+                  <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-500">
                     Scorecard
                   </p>
-                  <h3 className="text-2xl sm:text-3xl font-black tracking-tight mt-1">
+                  <h3 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
                     Current Scores
                   </h3>
                 </div>
                 <button
-                  onClick={() => setOpenScoreCardModal(false)}
-                  className="w-11 h-11 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center active:scale-95
-                    transition-all"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition-all hover:bg-white/10
+                  active:scale-95"
                   aria-label="Close modal"
+                  onClick={() => setOpenScoreCardModal(false)}
                 >
                   <X className="text-slate-300" size={18} />
                 </button>
               </div>
-              <div className="mt-7 space-y-2 flex-1 min-h-0 overflow-y-auto pr-1 sm:pr-2">
-                {players
-                  .sort((player1, player2) => (player2.score ?? 0) - (player1.score ?? 0))
-                  .map((player, idx) => (
-                    <div
-                      key={idx}
-                      className={`flex items-center justify-between gap-4 p-4 rounded-2xl border transition-colors ${
-                        idx === 0
-                          ? 'bg-cyan-500/10 border-cyan-500/20'
-                          : 'bg-slate-950/40 border-white/5'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
+              <div className="mt-7 flex-1 space-y-2 overflow-y-auto pr-1 sm:pr-2">
+                {sortedPlayers.map((player, idx) => (
+                  <div
+                    key={player.name ?? idx}
+                    className={`relative overflow-hidden rounded-2xl border p-4 transition-colors ${
+                      idx === 0
+                        ? 'border-cyan-500/20 bg-cyan-500/10'
+                        : 'border-white/5 bg-slate-950/40'
+                    }`}
+                  >
+                    {idx === 0 && (
+                      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-400/50 to-transparent" />
+                    )}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
                         <div
-                          className={`w-10 h-10 rounded-2xl flex items-center justify-center border ${
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${
                             idx === 0
-                              ? 'bg-cyan-500/15 border-cyan-500/25'
-                              : 'bg-white/5 border-white/10'
+                              ? 'border-cyan-500/25 bg-cyan-500/15'
+                              : 'border-white/10 bg-white/5'
                           }`}
                         >
                           <User
@@ -546,23 +631,56 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                             className={idx === 0 ? 'text-cyan-300' : 'text-slate-300'}
                           />
                         </div>
-                        <div className="leading-tight">
-                          <p className="font-black tracking-tight">{player.name}</p>
-                          <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em]">
-                            Player
-                          </p>
+                        <div className="min-w-0 leading-tight">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <p className="truncate font-black tracking-wide text-white">
+                              {player.name}
+                            </p>
+                            {idx === 0 && (
+                              <span
+                                className="shrink-0 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-[8px] font-black uppercase
+                                    tracking-[0.2em] text-cyan-200"
+                              >
+                                Lead
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                              Player
+                            </p>
+                            {(player.accumulated ?? 0) > 0 && (
+                              <div className="inline-flex items-center gap-1 rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-0.5">
+                                <span
+                                  className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-400/15 text-[9px] font-black leading-none
+                                  text-amber-200"
+                                >
+                                  !
+                                </span>
+                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-200/70">
+                                  Accum.
+                                </span>
+                                <span className="text-[10px] font-black tabular-nums text-amber-100">
+                                  {player.accumulated}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-black text-white tabular-nums">
+                      <div className="shrink-0 pl-2 text-right">
+                        <p
+                          className={`text-3xl font-black leading-none tabular-nums ${idx === 0 ? 'text-cyan-100' : 'text-white'}`}
+                        >
                           {player.score}
                         </p>
-                        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em]">
+                        <p className="mt-1 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
                           Points
                         </p>
                       </div>
                     </div>
-                  ))}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -634,7 +752,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                       Confirm Bid
                     </button>
                   </div>
-                  <div className="mt-6 flex flex-wrap items-center justify-center gap-6">
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-6">
                     <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-cyan-200">
                       {gameData.gameType}
                     </span>
@@ -703,7 +821,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
           </div>
         </div>
       )}
-      {gameData.roundStatus === SELECT_TRUMP && isPlayerTurn && (
+      {gameData.roundStatus === SELECT_TRUMP_STATUS && isPlayerTurn && (
         <div className="fixed inset-0 z-60 flex items-start sm:items-center justify-center p-4 sm:p-6 overflow-y-auto">
           <div className="absolute inset-0 bg-[#020617]/80 backdrop-blur-md" />
           <div
@@ -740,6 +858,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                     type="button"
                     className="group relative rounded-3xl border border-white/10 bg-slate-950/40 backdrop-blur-xl px-5 py-5 shadow-[0_18px_55px_rgba(0,0,0,0.45)]
                       transition-all duration-200 hover:bg-white/5 hover:border-white/15 active:scale-[0.99] text-left"
+                    onClick={() => handleRoundTrump(suit)}
                   >
                     <div className="absolute inset-0 rounded-[inherit] ring-1 ring-black/10 pointer-events-none" />
                     <div className="flex items-start justify-between gap-3">
@@ -775,7 +894,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
           </div>
         </div>
       )}
-      {gameData.winnerName && (
+      {winnerNames.length > 0 && (
         <div className="fixed inset-0 z-70 grid place-items-center overflow-hidden p-4 sm:p-6">
           <div
             className="absolute inset-0 bg-[#020617]/85 backdrop-blur-xl"
@@ -817,7 +936,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
               shadow-[0_30px_120px_rgba(0,0,0,0.7)] animate-in fade-in zoom-in-95 duration-200"
             role="dialog"
             aria-modal="true"
-            aria-label="Winner"
+            aria-label={winnerNames.length > 1 ? 'Winners' : 'Winner'}
           >
             <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.18)_0%,transparent_55%)] motion-safe:animate-pulse" />
             <button
@@ -850,25 +969,41 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                 Game Over
               </p>
               <h3 className="mt-2 text-3xl sm:text-4xl font-black tracking-tight">
-                {gameData.winnerName === playerName ? 'You Won!' : 'Winner'}
+                {winnerNames.includes(playerName)
+                  ? winnerNames.length > 1
+                    ? 'You Tied for the Win!'
+                    : 'You Won!'
+                  : winnerNames.length > 1
+                    ? 'Winners'
+                    : 'Winner'}
               </h3>
-              <div className="relative mt-7 rounded-4xl bg-white/4 border border-white/10 backdrop-blur-xl p-6 overflow-hidden">
+              <div className="relative mt-5 rounded-4xl bg-white/4 border border-white/10 backdrop-blur-xl py-6 overflow-hidden">
                 <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-400/40 to-transparent motion-safe:animate-pulse" />
                 <div
                   aria-hidden="true"
                   className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-cyan-400/10 blur-2xl motion-safe:animate-pulse motion-reduce:hidden"
                 />
-                <p className="relative text-3xl sm:text-4xl font-black tracking-tight truncate">
-                  {gameData.winnerName}
+                <p className="relative text-2xl sm:text-3xl font-black tracking-tight text-balance">
+                  {winnerNames.join(', ')}
                 </p>
-                <div className="relative mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/45 px-4 py-2">
-                    <span className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">
-                      Final Score
-                    </span>
-                    <span className="text-sm font-black text-white tabular-nums">
-                      {players.find((player) => player.name === gameData.winnerName).score}
-                    </span>
+                <div className="relative mt-5 flex flex-col items-center justify-center gap-3">
+                  <div className="flex flex-col justify-center items-center sm:flex-row gap-2">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/45 px-4 py-2">
+                      <span className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">
+                        Final Score
+                      </span>
+                      <span className="text-sm font-black text-white tabular-nums">
+                        {winningPlayers[0]?.score}
+                      </span>
+                    </div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/45 px-4 py-2">
+                      <span className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">
+                        Accumulated
+                      </span>
+                      <span className="text-sm font-black text-white tabular-nums">
+                        {winningPlayers[0]?.accumulated}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex flex-wrap justify-center gap-2">
                     <span

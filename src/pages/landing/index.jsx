@@ -27,7 +27,16 @@ const Button = ({ children, onClick, variant = 'primary', className = '', disabl
   );
 };
 
-const Input = ({ placeholder, value, onChange, label, icon: Icon, type = 'text', maxLength }) => (
+const Input = ({
+  placeholder,
+  value,
+  onChange,
+  label,
+  icon: Icon,
+  type = 'text',
+  maxLength,
+  autoCapitalize,
+}) => (
   <div className="flex flex-col gap-2 w-full">
     {label && <label className="text-sm font-medium text-slate-400 ml-1">{label}</label>}
     <div className="relative group">
@@ -42,6 +51,10 @@ const Input = ({ placeholder, value, onChange, label, icon: Icon, type = 'text',
         maxLength={maxLength}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        autoCapitalize={autoCapitalize}
+        autoComplete="off"
+        autoCorrect="of"
+        spellCheck={false}
         placeholder={placeholder}
         className="w-full bg-slate-900/40 border border-slate-800 rounded-xl py-3 pl-12 pr-4 text-white placeholder:text-slate-600 focus:outline-none
           focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 transition-all"
@@ -158,6 +171,7 @@ export const LandingPage = ({ onCreateGame, onJoinGame }) => {
               onChange={(value) => setGameCode(String(value ?? '').toUpperCase())}
               icon={ShieldCheck}
               maxLength={6}
+              autoCapitalize="characters"
             />
             <Button
               onClick={() => onJoinGame(gameCode, playerName, playerPin)}
