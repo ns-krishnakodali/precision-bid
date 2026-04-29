@@ -227,6 +227,8 @@ const updateTurnWinner = async (lobbyId) => {
   let startNewRound = false;
 
   await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
+    if (!lobbyData) return lobbyData;
+
     roundNumber = lobbyData?.roundNumber;
     startNewRound = lobbyData.rounds.at(-1)?.currentTurn === roundNumber;
 
