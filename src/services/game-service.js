@@ -44,6 +44,63 @@ const getBidWinner = (currentRound, lobbyPlayers) => {
 const getEffectiveSuit = (card, currentRound) =>
   card?.suit === JOKER ? currentRound.trumpSuit : card?.suit;
 
+const getSpadesTeams = (players = {}) => {
+  const orderedPlayers = Object.entries(players).sort(
+    ([, playerDetails1], [, playerDetails2]) =>
+      Number(playerDetails1?.orderIdx ?? 0) - Number(playerDetails2?.orderIdx ?? 0)
+  );
+  const halfPlayersCount = orderedPlayers.length / 2;
+  if (!Number.isInteger(halfPlayersCount) || halfPlayersCount === 0) return [];
+
+  return orderedPlayers.slice(0, halfPlayersCount).map(([playerName, playerDetails], idx) => {
+    const [partnerName, partnerDetails] = orderedPlayers[idx + halfPlayersCount];
+    return {
+      playerNames: [playerName, partnerName],
+      score: (playerDetails?.score ?? 0) + (partnerDetails?.score ?? 0),
+      accumulatedValues: [playerDetails?.accumulated ?? 0, partnerDetails?.accumulated ?? 0].sort(
+        (value1, value2) => value1 - value2
+      ),
+    };
+  });
+};
+
+const compareAccumulatedValues = (values1 = [], values2 = []) => {
+  for (let idx = 0; idx < Math.max(values1.length, values2.length); idx++) {
+    const value1 = values1[idx] ?? Number.POSITIVE_INFINITY;
+    const value2 = values2[idx] ?? Number.POSITIVE_INFINITY;
+    if (value1 !== value2) return value1 - value2;
+  }
+
+  return 0;
+};
+
+const getIndividualWinnerNames = (players = {}) => {
+  let winnerNames = [];
+  let winningScore = Number.NEGATIVE_INFINITY;
+  let winningAccumulated = Number.POSITIVE_INFINITY;
+
+  for (const [playerName, playerDetails] of Object.entries(players)) {
+    const playerScore = playerDetails.score ?? 0;
+    const playerAccumulated = playerDetails.accumulated ?? 0;
+
+    if (
+      playerScore > winningScore ||
+      (playerScore === winningScore && playerAccumulated < winningAccumulated)
+    ) {
+      winningScore = playerScore;
+      winningAccumulated = playerAccumulated;
+      winnerNames = [playerName];
+      continue;
+    }
+
+    if (playerScore === winningScore && playerAccumulated === winningAccumulated) {
+      winnerNames.push(playerName);
+    }
+  }
+
+  return winnerNames;
+};
+
 const addNewRound = async (lobbyId) => {
   if (!lobbyId) throw new Error('Missing lobbyId.');
 
@@ -139,7 +196,7 @@ const updateRoundTrump = async (lobbyId, trumpSuit) => {
     const currentRound = lobbyData.rounds.at(-1);
 
     if (
-      lobbyData.gameType === GAME_TYPE.BID_WHIST ||
+      lobbyData.gameType === GAME_TYPE.BID_WHIST &&
       lobbyData.variant !== BID_WHIST_VARIANT.NO_TRUMP
     ) {
       const bidWinner = getBidWinner(currentRound, lobbyData.players);
@@ -287,30 +344,42 @@ const updateRoundWinnner = async (lobbyId) => {
 
     roundNumber = lobbyData.roundNumber;
     if (roundNumber >= MAX_ROUNDS) {
-      let winnerNames = [];
-      let winningScore = Number.NEGATIVE_INFINITY;
-      let winningAccumulated = Number.POSITIVE_INFINITY;
+      if (lobbyData.gameType === GAME_TYPE.SPADES) {
+        const teams = getSpadesTeams(lobbyData.players);
+        let winnerTeams = [];
+        let winningScore = Number.NEGATIVE_INFINITY;
+        let winningAccumulatedValues = [];
 
-      for (const [playerName, playerDetails] of Object.entries(lobbyData.players)) {
-        const playerScore = playerDetails.score ?? 0;
-        const playerAccumulated = playerDetails.accumulated ?? 0;
+        for (const teamDetails of teams) {
+          const scoreComparison = teamDetails.score - winningScore;
+          const accumulatedComparison = compareAccumulatedValues(
+            teamDetails.accumulatedValues,
+            winningAccumulatedValues
+          );
 
-        if (
-          playerScore > winningScore ||
-          (playerScore === winningScore && playerAccumulated < winningAccumulated)
-        ) {
-          winningScore = playerScore;
-          winningAccumulated = playerAccumulated;
-          winnerNames = [playerName];
-          continue;
+          if (
+            scoreComparison > 0 ||
+            (scoreComparison === 0 && accumulatedComparison < 0) ||
+            winnerTeams.length === 0
+          ) {
+            winningScore = teamDetails.score;
+            winningAccumulatedValues = teamDetails.accumulatedValues;
+            winnerTeams = [teamDetails];
+            continue;
+          }
+
+          if (scoreComparison === 0 && accumulatedComparison === 0) {
+            winnerTeams.push(teamDetails);
+          }
         }
 
-        if (playerScore === winningScore && playerAccumulated === winningAccumulated) {
-          winnerNames.push(playerName);
-        }
+        lobbyData.winnerNames =
+          winnerTeams.length > 0
+            ? winnerTeams.flatMap((teamDetails) => teamDetails.playerNames)
+            : getIndividualWinnerNames(lobbyData.players);
+      } else {
+        lobbyData.winnerNames = getIndividualWinnerNames(lobbyData.players);
       }
-
-      lobbyData.winnerNames = winnerNames;
     }
 
     return lobbyData;

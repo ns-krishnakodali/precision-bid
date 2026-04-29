@@ -271,6 +271,35 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
     [players]
   );
 
+  const isSpadesGame = gameData.gameType === GAME_TYPE.SPADES;
+
+  const spadesTeams = useMemo(() => {
+    if (!isSpadesGame) return [];
+
+    const halfPlayersCount = players.length / 2;
+
+    return players
+      .slice(0, halfPlayersCount)
+      .map((player, idx) => {
+        const partner = players[idx + halfPlayersCount];
+        return {
+          teamName: `Team ${idx + 1}`,
+          teamKey: `${player.name}-${partner.name}`,
+          players: [player, partner],
+          score: (player.score ?? 0) + (partner.score ?? 0),
+          accumulatedValues: [player.accumulated ?? 0, partner.accumulated ?? 0].sort(
+            (value1, value2) => value1 - value2
+          ),
+        };
+      })
+      .sort(
+        (team1, team2) =>
+          team2.score - team1.score ||
+          team1.accumulatedValues[0] - team2.accumulatedValues[0] ||
+          team1.accumulatedValues[1] - team2.accumulatedValues[1]
+      );
+  }, [isSpadesGame, players]);
+
   // Variables
   const currentPlayer = players[gameData?.currentPlayerIdx ?? 0]?.name;
   const isPlayerTurn = currentPlayer === playerName;
@@ -309,10 +338,12 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
         gameData.variant === BID_WHIST_VARIANT.UPTOWN ||
           gameData.variant === BID_WHIST_VARIANT.DOWNTOWN
           ? undefined
-          : gameData.gameType === GAME_TYPE.SPADES
+          : isSpadesGame
             ? SPADE
             : ''
       );
+
+    setBidCount('');
   };
 
   const handleRoundTrump = async (suit) => {
@@ -456,7 +487,15 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                   <div className="absolute inset-[3%] rounded-[999px] border border-dashed border-white/10" />
                 </div>
               </div>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
+              {isSpadesGame && (
+                <div className="absolute inset-0 pointer-events-none z-5">
+                  <div className="absolute left-[14%] right-[14%] top-1/2 -translate-y-1/2 border-t border-dashed border-white/14" />
+                  <div className="absolute top-[14%] bottom-[14%] left-1/2 -translate-x-1/2 border-l border-dashed border-white/14" />
+                  <div className="absolute left-[14%] right-[14%] top-1/2 -translate-y-1/2 h-px bg-linear-to-r from-transparent via-cyan-300/15 to-transparent" />
+                  <div className="absolute top-[14%] bottom-[14%] left-1/2 -translate-x-1/2 w-px bg-linear-to-b from-transparent via-cyan-300/15 to-transparent" />
+                </div>
+              )}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-7">
                 <div className="relative w-53">
                   <div className="absolute -inset-2 rounded-full bg-cyan-500/20 blur-xl animate-pulse" />
                   <div className="relative rounded-full p-0.5 overflow-hidden">
@@ -602,7 +641,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                     Scorecard
                   </p>
                   <h3 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
-                    Current Scores
+                    {isSpadesGame ? 'Team Scores' : 'Current Scores'}
                   </h3>
                 </div>
                 <button
@@ -618,87 +657,206 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                 </button>
               </div>
               <div className="mt-7 flex-1 space-y-2 overflow-y-auto pr-1 sm:pr-2">
-                {sortedPlayers.map((player, idx) => (
-                  <div
-                    key={player.name ?? idx}
-                    className={`relative overflow-hidden rounded-2xl border p-4 transition-colors ${
-                      idx === 0
-                        ? 'border-cyan-500/20 bg-cyan-500/10'
-                        : 'border-white/5 bg-slate-950/40'
-                    }`}
-                  >
-                    {idx === 0 && (
-                      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-400/50 to-transparent" />
-                    )}
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div
-                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${
-                            idx === 0
-                              ? 'border-cyan-500/25 bg-cyan-500/15'
-                              : 'border-white/10 bg-white/5'
-                          }`}
-                        >
-                          <User
-                            size={18}
-                            className={idx === 0 ? 'text-cyan-300' : 'text-slate-300'}
-                          />
-                        </div>
-                        <div className="min-w-0 leading-tight">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <p className="truncate font-black tracking-wide text-white">
-                              {player.name}
-                            </p>
-                            {idx === 0 && (
-                              <span
-                                className="shrink-0 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-[8px] font-black uppercase
-                                    tracking-[0.2em] text-cyan-200"
-                              >
-                                Lead
-                              </span>
-                            )}
-                          </div>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
-                              Player
-                            </p>
-                            {(player.accumulated ?? 0) > 0 && (
-                              <div className="inline-flex items-center gap-1 rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-0.5">
+                {isSpadesGame
+                  ? spadesTeams.map((team, idx) => (
+                      <div
+                        key={team.teamKey}
+                        className={`relative overflow-hidden rounded-2xl border p-4 transition-colors ${
+                          idx === 0
+                            ? 'border-cyan-500/20 bg-cyan-500/10'
+                            : 'border-white/5 bg-slate-950/40'
+                        }`}
+                      >
+                        {idx === 0 && (
+                          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-400/50 to-transparent" />
+                        )}
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <p className="truncate font-black tracking-wide text-white">
+                                {team.teamName}
+                              </p>
+                              {idx === 0 && (
                                 <span
-                                  className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-400/15 text-[9px] font-black leading-none
-                                  text-amber-200"
+                                  className="shrink-0 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-[8px] font-black uppercase
+                                  tracking-[0.2em] text-cyan-200"
                                 >
-                                  !
+                                  Lead
                                 </span>
-                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-200/70">
-                                  Accum.
-                                </span>
-                                <span className="text-[10px] font-black tabular-nums text-amber-100">
-                                  {player.accumulated}
-                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                              Opposite Seats
+                            </p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p
+                              className={`text-3xl font-black leading-none tabular-nums ${
+                                idx === 0 ? 'text-cyan-100' : 'text-white'
+                              }`}
+                            >
+                              {team.score}
+                            </p>
+                            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                              Team Points
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3 space-y-2">
+                          {team.players.map((teamPlayer) => (
+                            <div
+                              key={teamPlayer.name}
+                              className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-slate-950/45 px-3 py-2"
+                            >
+                              <div className="flex min-w-0 items-center gap-2.5">
+                                <div
+                                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${
+                                    idx === 0
+                                      ? 'border-cyan-500/20 bg-cyan-500/12'
+                                      : 'border-white/10 bg-white/5'
+                                  }`}
+                                >
+                                  <User
+                                    size={16}
+                                    className={idx === 0 ? 'text-cyan-300' : 'text-slate-300'}
+                                  />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-black tracking-wide text-white">
+                                    {teamPlayer.name}
+                                  </p>
+                                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                    <p className="text-[9px] font-black uppercase tracking-[0.24em] text-slate-500">
+                                      Player
+                                    </p>
+                                    <div
+                                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 ${
+                                        (teamPlayer.accumulated ?? 0) > 0
+                                          ? 'border-amber-400/20 bg-amber-400/10'
+                                          : 'border-white/12 bg-white/5'
+                                      }`}
+                                    >
+                                      <span
+                                        className={`text-[9px] font-black uppercase tracking-[0.2em] ${
+                                          (teamPlayer.accumulated ?? 0) > 0
+                                            ? 'text-amber-200/70'
+                                            : 'text-slate-400'
+                                        }`}
+                                      >
+                                        Accum.
+                                      </span>
+                                      <span
+                                        className={`text-[10px] font-black tabular-nums ${
+                                          (teamPlayer.accumulated ?? 0) > 0
+                                            ? 'text-amber-100'
+                                            : 'text-slate-200'
+                                        }`}
+                                      >
+                                        {teamPlayer.accumulated ?? 0}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
-                            )}
+                              <div className="shrink-0 pl-2 text-right">
+                                <button
+                                  type="button"
+                                  className="rounded-xl px-2 py-1 text-2xl font-black leading-none tabular-nums text-white transition-colors hover:bg-white/5"
+                                  aria-label={`View ${teamPlayer.name} round history`}
+                                  onClick={() => setScoreHistoryPlayerName(teamPlayer.name)}
+                                >
+                                  {teamPlayer.score}
+                                </button>
+                                <p className="mt-1 text-[9px] font-black uppercase tracking-[0.24em] text-slate-500">
+                                  Points
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  : sortedPlayers.map((player, idx) => (
+                      <div
+                        key={player.name ?? idx}
+                        className={`relative overflow-hidden rounded-2xl border p-4 transition-colors ${
+                          idx === 0
+                            ? 'border-cyan-500/20 bg-cyan-500/10'
+                            : 'border-white/5 bg-slate-950/40'
+                        }`}
+                      >
+                        {idx === 0 && (
+                          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-400/50 to-transparent" />
+                        )}
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${
+                                idx === 0
+                                  ? 'border-cyan-500/25 bg-cyan-500/15'
+                                  : 'border-white/10 bg-white/5'
+                              }`}
+                            >
+                              <User
+                                size={18}
+                                className={idx === 0 ? 'text-cyan-300' : 'text-slate-300'}
+                              />
+                            </div>
+                            <div className="min-w-0 leading-tight">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <p className="truncate font-black tracking-wide text-white">
+                                  {player.name}
+                                </p>
+                                {idx === 0 && (
+                                  <span
+                                    className="shrink-0 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-[8px] font-black uppercase
+                                    tracking-[0.2em] text-cyan-200"
+                                  >
+                                    Lead
+                                  </span>
+                                )}
+                              </div>
+                              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                                  Player
+                                </p>
+                                {(player.accumulated ?? 0) > 0 && (
+                                  <div className="inline-flex items-center gap-1 rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-0.5">
+                                    <span
+                                      className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-400/15 text-[9px] font-black leading-none
+                                      text-amber-200"
+                                    >
+                                      !
+                                    </span>
+                                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-200/70">
+                                      Accum.
+                                    </span>
+                                    <span className="text-[10px] font-black tabular-nums text-amber-100">
+                                      {player.accumulated}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="shrink-0 pl-2 text-right">
+                            <button
+                              type="button"
+                              className={`rounded-xl px-2 py-1 text-3xl font-black leading-none tabular-nums transition-colors hover:bg-white/5 ${
+                                idx === 0 ? 'text-cyan-100' : 'text-white'
+                              }`}
+                              aria-label={`View ${player.name} round history`}
+                              onClick={() => setScoreHistoryPlayerName(player.name)}
+                            >
+                              {player.score}
+                            </button>
+                            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                              Points
+                            </p>
                           </div>
                         </div>
                       </div>
-                      <div className="shrink-0 pl-2 text-right">
-                        <button
-                          type="button"
-                          className={`rounded-xl px-2 py-1 text-3xl font-black leading-none tabular-nums transition-colors hover:bg-white/5 ${
-                            idx === 0 ? 'text-cyan-100' : 'text-white'
-                          }`}
-                          aria-label={`View ${player.name} round history`}
-                          onClick={() => setScoreHistoryPlayerName(player.name)}
-                        >
-                          {player.score}
-                        </button>
-                        <p className="mt-1 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
-                          Points
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    ))}
               </div>
             </div>
           </div>
