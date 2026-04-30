@@ -9,6 +9,7 @@ export const BIG_JOKER = 'BJ';
 export const SMALL_JOKER = 'SJ';
 
 export const MAX_ATTEMPTS = 10;
+export const MAX_CARDS = 52;
 export const MAX_ROUNDS = 13;
 export const MAX_ORDER = 14;
 export const MAX_ACCUMULATED = 5;

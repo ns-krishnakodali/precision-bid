@@ -15,12 +15,14 @@ import { gameService } from '../game-service';
 import { lobbyService } from '../lobby-service';
 
 import {
+  BID_WHIST_VARIANT,
   BOT_NAME_LIMIT,
   BOT_NAME_PREFIX,
   BOT_PIN,
   GAME_TYPE,
   LOBBY_STATUS,
   MAX_ATTEMPTS,
+  MAX_CARDS,
   SPADES_VARIANT,
 } from '../../constants';
 import { db } from '../../firebase';
@@ -70,6 +72,19 @@ const createLobby = (overrides = {}) => ({
   status: LOBBY_STATUS.WAITING,
   ...overrides,
 });
+
+const createLobbyPlayersByCount = (playersCount) =>
+  Object.fromEntries(
+    Array.from({ length: playersCount }, (_, idx) => [
+      `Player${idx + 1}`,
+      {
+        isHost: idx === 0,
+        joinedAt: 1000 + idx,
+        name: `Player${idx + 1}`,
+        pin: String(1111 + idx),
+      },
+    ])
+  );
 
 const useTransactionData = (initialData) => {
   let data = deepClone(initialData);
@@ -569,6 +584,22 @@ describe('lobbyService', () => {
       ).toEqual(new Set([0, 1, 2, 3]));
       expect(gameService.addNewRound).toHaveBeenCalledWith('lobby-1');
       expect(lobbyData).toEqual(lobbyBefore);
+    });
+
+    it('uses the computed Bid Whist No Trump cap when seeding the first round', async () => {
+      const lobbyData = createLobby({
+        gameType: GAME_TYPE.BID_WHIST,
+        players: createLobbyPlayersByCount(7),
+      });
+      get.mockResolvedValue(snapshot(lobbyData));
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+
+      await lobbyService.startGame('lobby-1', BID_WHIST_VARIANT.NO_TRUMP);
+
+      const updates = update.mock.calls[0][1];
+      expect(updates['lobby/lobby-1/roundNumber']).toBe(Math.floor(MAX_CARDS / 7) - 1);
+      expect(updates['lobby/lobby-1/variant']).toBe(BID_WHIST_VARIANT.NO_TRUMP);
+      expect(gameService.addNewRound).toHaveBeenCalledWith('lobby-1');
     });
 
     it('throws when the lobby is not found', async () => {

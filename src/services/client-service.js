@@ -1,6 +1,8 @@
 import { LOCAL_STORAGE_KEYS } from '../constants';
 import { deleteStorageValue, getStorageValue, setStorageValue } from '../utils';
 
+// Private Methods
+
 const getLegacyRawValue = (key) => {
   try {
     return localStorage.getItem(key);
@@ -13,6 +15,8 @@ const createClientId = () => {
   if (crypto.randomUUID) return crypto.randomUUID();
   return `client_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
 };
+
+// Public Methods
 
 const getOrCreateClientId = () => {
   const storedId = getStorageValue(LOCAL_STORAGE_KEYS.CLIENT_ID, null);
@@ -53,7 +57,7 @@ const setDisplayName = (displayName) => {
 };
 
 export const clientService = {
-  getDisplayName,
   getOrCreateClientId,
+  getDisplayName,
   setDisplayName,
 };

@@ -20,10 +20,13 @@ import {
   GAME_TYPE,
   LOBBY_STATUS,
   MAX_ATTEMPTS,
+  MAX_CARDS,
 } from '../constants';
 import { db } from '../firebase';
 import { generateUniqueCode } from '../utils';
 import { gameService } from './game-service';
+
+// Private Methods
 
 const isReservedBotName = (playerName) => {
   for (let botIdx = 1; botIdx <= BOT_NAME_LIMIT; botIdx++) {
@@ -32,6 +35,17 @@ const isReservedBotName = (playerName) => {
 
   return false;
 };
+
+const getRoundNumber = (lobbyData, variant) => {
+  if (lobbyData?.gameType !== GAME_TYPE.BID_WHIST || variant !== BID_WHIST_VARIANT.NO_TRUMP) {
+    return GAME_ROUNDS[variant];
+  }
+
+  const playersCount = Object.keys(lobbyData?.players ?? {}).length;
+  return playersCount > 0 ? Math.floor(MAX_CARDS / playersCount) : GAME_ROUNDS[variant];
+};
+
+// Public methods
 
 const getLobbyIdByCode = async (gameCode) => {
   const normalizedCode = String(gameCode ?? '')
@@ -217,7 +231,7 @@ const startGame = async (lobbyId, variant) => {
 
   if (!playerNames.length) throw new Error('No players found in lobby');
 
-  const roundNumber = GAME_ROUNDS[variant];
+  const roundNumber = getRoundNumber(lobbyData, variant);
   if (!roundNumber) {
     throw new Error('Invalid variant. Please select a valid game variant before starting');
   }

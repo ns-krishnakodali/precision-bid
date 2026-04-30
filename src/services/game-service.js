@@ -13,6 +13,7 @@ import {
   GAME_TYPE,
   JOKER,
   MAX_ACCUMULATED,
+  MAX_CARDS,
   MAX_ORDER,
   MAX_ROUNDS,
   NEW_ROUND_STATUS,
@@ -26,6 +27,8 @@ import {
 } from '../constants';
 import { db } from '../firebase';
 import { dealCards } from '../utils';
+
+// Private Methods
 
 const getBidWinner = (currentRound, lobbyPlayers) => {
   let bidWinner = '';
@@ -152,6 +155,16 @@ const getNextPlayerIdx = (lobbyData) => {
 
 const isBidWhistTrumpVariant = (lobbyData) =>
   lobbyData?.gameType === GAME_TYPE.BID_WHIST && lobbyData?.variant !== BID_WHIST_VARIANT.NO_TRUMP;
+
+const getMaxRounds = (lobbyData) => {
+  if (lobbyData?.gameType !== GAME_TYPE.BID_WHIST) return MAX_ROUNDS;
+
+  const playersCount = Object.keys(lobbyData?.players ?? {}).length;
+  if (playersCount <= 0) return MAX_ROUNDS;
+
+  const totalCards = MAX_CARDS + (isBidWhistTrumpVariant(lobbyData) ? 2 : 0);
+  return Math.floor(totalCards / playersCount) || MAX_ROUNDS;
+};
 
 const getComparableCardRank = (card, variant) => {
   let cardRank = CARDS_ORDER[card?.value] ?? 0;
@@ -444,6 +457,8 @@ const chooseBotCard = (lobbyData, playerName) => {
   )[0];
 };
 
+// Public Methods
+
 const addNewRound = async (lobbyId) => {
   if (!lobbyId) throw new Error('Missing lobbyId.');
 
@@ -451,6 +466,7 @@ const addNewRound = async (lobbyId) => {
     if (!lobbyData) return lobbyData;
 
     const playersNames = Object.keys(lobbyData.players ?? {});
+    const maxRounds = getMaxRounds(lobbyData);
 
     const roundPlayers = playersNames.reduce((acc, playerName) => {
       acc[playerName] = {
@@ -474,7 +490,7 @@ const addNewRound = async (lobbyId) => {
 
     const { dealtCards } = dealCards(
       playersNames.length,
-      lobbyData.roundNumber,
+      Math.min(lobbyData.roundNumber, maxRounds),
       lobbyData.gameType === GAME_TYPE.BID_WHIST && lobbyData.variant !== BID_WHIST_VARIANT.NO_TRUMP
     );
 
@@ -674,11 +690,12 @@ const updateTurnWinner = async (lobbyId) => {
   await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
     if (!lobbyData) return lobbyData;
 
+    const maxRounds = getMaxRounds(lobbyData);
     roundNumber = lobbyData?.roundNumber;
     startNewRound = lobbyData.rounds.at(-1)?.currentTurn === roundNumber;
 
     if (startNewRound) {
-      if (roundNumber < MAX_ROUNDS) {
+      if (roundNumber < maxRounds) {
         lobbyData.roundStatus = NEW_ROUND_STATUS;
         lobbyData.statusText = ROUND_START_MESSAGE;
       } else {
@@ -768,11 +785,13 @@ const updateRoundWinnner = async (lobbyId) => {
   if (!lobbyId) throw new Error('Missing lobbyId.');
 
   let roundNumber = null;
+  let maxRounds = MAX_ROUNDS;
 
   await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
     if (!lobbyData) return lobbyData;
 
     const currentRound = lobbyData.rounds.at(-1);
+    maxRounds = getMaxRounds(lobbyData);
 
     for (let [playerName, playerDetails] of Object.entries(currentRound.players)) {
       if (typeof playerDetails.wins === 'undefined' || typeof playerDetails.bids === 'undefined') {
@@ -786,7 +805,9 @@ const updateRoundWinnner = async (lobbyId) => {
       let totalAccumulated = (playerObj?.accumulated ?? 0) + (wins > bids ? wins - bids : 0);
 
       if (totalAccumulated >= MAX_ACCUMULATED) {
-        score -= Math.floor(totalAccumulated / MAX_ACCUMULATED) * MAX_ACCUMULATED * POINTS;
+        playerDetails.accumulatedPenalty =
+          Math.floor(totalAccumulated / MAX_ACCUMULATED) * MAX_ACCUMULATED * POINTS;
+        score -= playerDetails.accumulatedPenalty;
         totalAccumulated %= MAX_ACCUMULATED;
       }
 
@@ -795,7 +816,7 @@ const updateRoundWinnner = async (lobbyId) => {
     }
 
     roundNumber = lobbyData.roundNumber;
-    if (roundNumber >= MAX_ROUNDS) {
+    if (roundNumber >= maxRounds) {
       if (lobbyData.gameType === GAME_TYPE.SPADES) {
         const teams = getSpadesTeams(lobbyData.players);
         let winnerTeams = [];
@@ -837,7 +858,7 @@ const updateRoundWinnner = async (lobbyId) => {
     return lobbyData;
   });
 
-  if ((roundNumber ?? MAX_ROUNDS) < MAX_ROUNDS) {
+  if ((roundNumber ?? MAX_ROUNDS) < maxRounds) {
     await addNewRound(lobbyId);
   }
 };

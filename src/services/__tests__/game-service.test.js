@@ -16,6 +16,7 @@ import {
   HEART,
   JOKER,
   MAX_ACCUMULATED,
+  MAX_CARDS,
   MAX_ROUNDS,
   NEW_ROUND_STATUS,
   NEW_TURN_STATUS,
@@ -66,10 +67,28 @@ const createNewRoundPlayers = () => ({
   Player4: { bids: 0, played: [], wins: 0 },
 });
 
-const playedOnLastTurn = (cardDetails) =>
-  Array(MAX_ROUNDS - 1)
+const createPlayersByCount = (playersCount) =>
+  Object.fromEntries(
+    Array.from({ length: playersCount }, (_, idx) => [
+      `Player${idx + 1}`,
+      { accumulated: 0, cards: [], orderIdx: idx, score: 0 },
+    ])
+  );
+
+const createRoundPlayersByCount = (playersCount, overrides = {}) =>
+  Object.fromEntries(
+    Array.from({ length: playersCount }, (_, idx) => {
+      const playerName = `Player${idx + 1}`;
+      return [playerName, { bids: 0, played: [], wins: 0, ...overrides[playerName] }];
+    })
+  );
+
+const playedOnTurn = (turnCount, cardDetails) =>
+  Array(turnCount - 1)
     .fill(null)
     .concat(cardDetails);
+
+const playedOnLastTurn = (cardDetails) => playedOnTurn(MAX_ROUNDS, cardDetails);
 
 const createLobby = (overrides = {}) => ({
   currentPlayerIdx: 0,
@@ -154,6 +173,42 @@ describe('gameService', () => {
       ]);
       expect(data.players.Player1.cards).toEqual([card('A', SPADE)]);
       expect(data.players.Player4.cards).toEqual([card('J', DIAMOND)]);
+    });
+
+    it('caps Bid Whist Uptown rounds using 54 cards across the player count', async () => {
+      const players = createPlayersByCount(5);
+      const transaction = useTransactionData(
+        createLobby({
+          gameType: GAME_TYPE.BID_WHIST,
+          players,
+          roundNumber: Math.floor((MAX_CARDS + 2) / 5) - 1,
+          rounds: [],
+          variant: BID_WHIST_VARIANT.UPTOWN,
+        })
+      );
+
+      await gameService.addNewRound('lobby-1');
+
+      expect(dealCards).toHaveBeenCalledWith(5, Math.floor((MAX_CARDS + 2) / 5), true);
+      expect(transaction.getData().roundNumber).toBe(Math.floor((MAX_CARDS + 2) / 5));
+    });
+
+    it('caps Bid Whist No Trump rounds using 52 cards across the player count', async () => {
+      const players = createPlayersByCount(7);
+      const transaction = useTransactionData(
+        createLobby({
+          gameType: GAME_TYPE.BID_WHIST,
+          players,
+          roundNumber: Math.floor(MAX_CARDS / 7) - 1,
+          rounds: [],
+          variant: BID_WHIST_VARIANT.NO_TRUMP,
+        })
+      );
+
+      await gameService.addNewRound('lobby-1');
+
+      expect(dealCards).toHaveBeenCalledWith(7, Math.floor(MAX_CARDS / 7), false);
+      expect(transaction.getData().roundNumber).toBe(Math.floor(MAX_CARDS / 7));
     });
 
     it('throws for a missing lobby id before touching Firebase', async () => {
@@ -822,6 +877,82 @@ describe('gameService', () => {
       expect(data.rounds.at(-1).players.Player1.wins).toBe(1);
     });
 
+    it('uses the computed Bid Whist round cap when finalizing the last round', async () => {
+      vi.useFakeTimers();
+      const bidWhistMaxRounds = Math.floor(MAX_CARDS / 7);
+      const players = {
+        ...createPlayersByCount(7),
+        Player1: { accumulated: 0, cards: [], orderIdx: 0, score: 20 },
+        Player2: { accumulated: 0, cards: [], orderIdx: 1, score: 30 },
+        Player3: { accumulated: 0, cards: [], orderIdx: 2, score: 40 },
+        Player4: { accumulated: 0, cards: [], orderIdx: 3, score: 50 },
+        Player5: { accumulated: 0, cards: [], orderIdx: 4, score: 60 },
+        Player6: { accumulated: 0, cards: [], orderIdx: 5, score: 70 },
+        Player7: { accumulated: 0, cards: [], orderIdx: 6, score: 80 },
+      };
+      const transaction = useTransactionData(
+        createLobby({
+          gameType: GAME_TYPE.BID_WHIST,
+          players,
+          roundNumber: bidWhistMaxRounds,
+          rounds: [
+            {
+              currentTurn: bidWhistMaxRounds,
+              players: createRoundPlayersByCount(7, {
+                Player1: {
+                  bids: 1,
+                  played: playedOnTurn(bidWhistMaxRounds, card('2', CLUB)),
+                  wins: 0,
+                },
+                Player2: {
+                  bids: 1,
+                  played: playedOnTurn(bidWhistMaxRounds, card('3', CLUB)),
+                  wins: 0,
+                },
+                Player3: {
+                  bids: 1,
+                  played: playedOnTurn(bidWhistMaxRounds, card('4', CLUB)),
+                  wins: 0,
+                },
+                Player4: {
+                  bids: 1,
+                  played: playedOnTurn(bidWhistMaxRounds, card('5', CLUB)),
+                  wins: 0,
+                },
+                Player5: {
+                  bids: 1,
+                  played: playedOnTurn(bidWhistMaxRounds, card('6', CLUB)),
+                  wins: 0,
+                },
+                Player6: {
+                  bids: 1,
+                  played: playedOnTurn(bidWhistMaxRounds, card('7', CLUB)),
+                  wins: 0,
+                },
+                Player7: {
+                  bids: 1,
+                  played: playedOnTurn(bidWhistMaxRounds, card('8', CLUB)),
+                  wins: 0,
+                },
+              }),
+              startPlayerIdx: 0,
+              trumpSuit: '',
+            },
+          ],
+          variant: BID_WHIST_VARIANT.NO_TRUMP,
+        })
+      );
+
+      const updatePromise = gameService.updateTurnWinner('lobby-1');
+      await vi.advanceTimersByTimeAsync(1200);
+      await updatePromise;
+
+      const data = transaction.getData();
+      expect(transaction.states[0].roundStatus).toBe(GAME_OVER_STATUS);
+      expect(data.roundStatus).toBe(GAME_OVER_STATUS);
+      expect(data.winnerNames).toEqual(['Player7']);
+    });
+
     it('scores the round and adds a new one before max rounds', async () => {
       vi.useFakeTimers();
       const transaction = useTransactionData(
@@ -907,6 +1038,10 @@ describe('gameService', () => {
       expect(data.players.Player2).toMatchObject({ accumulated: 1, score: -25 });
       expect(data.players.Player3).toMatchObject({ accumulated: 1, score: 10 });
       expect(data.players.Player4).toMatchObject({ accumulated: 0, score: 5 });
+      expect(data.rounds.at(-1).players.Player1.accumulatedPenalty).toBeUndefined();
+      expect(data.rounds.at(-1).players.Player2.accumulatedPenalty).toBe(50);
+      expect(data.rounds.at(-1).players.Player3.accumulatedPenalty).toBeUndefined();
+      expect(data.rounds.at(-1).players.Player4.accumulatedPenalty).toBeUndefined();
     });
 
     it('selects individual winners by score and lower accumulated value', async () => {
@@ -926,6 +1061,71 @@ describe('gameService', () => {
       await gameService.updateRoundWinnner('lobby-1');
 
       expect(transaction.getData().winnerNames).toEqual(['Player1', 'Player4']);
+    });
+
+    it('declares Bid Whist winners at the computed max rounds', async () => {
+      const bidWhistMaxRounds = Math.floor(MAX_CARDS / 7);
+      const players = {
+        ...createPlayersByCount(7),
+        Player1: { accumulated: 0, cards: [], orderIdx: 0, score: 60 },
+        Player2: { accumulated: 1, cards: [], orderIdx: 1, score: 70 },
+        Player3: { accumulated: 0, cards: [], orderIdx: 2, score: 80 },
+        Player4: { accumulated: 0, cards: [], orderIdx: 3, score: 90 },
+        Player5: { accumulated: 0, cards: [], orderIdx: 4, score: 100 },
+        Player6: { accumulated: 0, cards: [], orderIdx: 5, score: 110 },
+        Player7: { accumulated: 0, cards: [], orderIdx: 6, score: 120 },
+      };
+      const transaction = useTransactionData(
+        createLobby({
+          gameType: GAME_TYPE.BID_WHIST,
+          players,
+          roundNumber: bidWhistMaxRounds,
+          rounds: [
+            {
+              currentTurn: 1,
+              players: createRoundPlayersByCount(7),
+              startPlayerIdx: 0,
+              trumpSuit: '',
+            },
+          ],
+          variant: BID_WHIST_VARIANT.NO_TRUMP,
+        })
+      );
+
+      await gameService.updateRoundWinnner('lobby-1');
+
+      expect(transaction.getData().winnerNames).toEqual(['Player7']);
+      expect(transaction.getData().rounds).toHaveLength(1);
+    });
+
+    it('adds a new Bid Whist round while still below the computed max rounds', async () => {
+      const players = createPlayersByCount(7);
+      const transaction = useTransactionData(
+        createLobby({
+          gameType: GAME_TYPE.BID_WHIST,
+          players,
+          roundNumber: Math.floor(MAX_CARDS / 7) - 1,
+          rounds: [
+            {
+              currentTurn: Math.floor(MAX_CARDS / 7) - 1,
+              players: createRoundPlayersByCount(7, {
+                Player1: { bids: 1, wins: 1 },
+                Player2: { bids: 1, wins: 0 },
+              }),
+              startPlayerIdx: 0,
+              trumpSuit: '',
+            },
+          ],
+          variant: BID_WHIST_VARIANT.NO_TRUMP,
+        })
+      );
+
+      await gameService.updateRoundWinnner('lobby-1');
+
+      expect(transaction.getData().roundNumber).toBe(Math.floor(MAX_CARDS / 7));
+      expect(transaction.getData().roundStatus).toBe(BIDDING);
+      expect(transaction.getData().rounds).toHaveLength(2);
+      expect(dealCards).toHaveBeenCalledWith(7, Math.floor(MAX_CARDS / 7), false);
     });
 
     it('selects Spades winners by opposite-seat team score', async () => {
@@ -1019,6 +1219,37 @@ describe('gameService', () => {
 
       expect(transaction.getData().players.Player1.accumulated).toBe(2);
       expect(transaction.getData().players.Player1.score).toBe(-40);
+      expect(transaction.getData().rounds.at(-1).players.Player1.accumulatedPenalty).toBe(50);
+    });
+
+    it('stores the full accumulated penalty amount when multiple thresholds are crossed', async () => {
+      const transaction = useTransactionData(
+        createLobby({
+          players: {
+            Player1: { accumulated: MAX_ACCUMULATED - 1, cards: [], orderIdx: 0, score: 0 },
+            Player2: { accumulated: 0, cards: [], orderIdx: 1, score: 0 },
+            Player3: { accumulated: 0, cards: [], orderIdx: 2, score: 0 },
+            Player4: { accumulated: 0, cards: [], orderIdx: 3, score: 0 },
+          },
+          roundNumber: MAX_ROUNDS,
+          rounds: [
+            {
+              currentTurn: 1,
+              players: createRoundPlayers({
+                Player1: { bids: 1, wins: 11 },
+              }),
+              startPlayerIdx: 0,
+              trumpSuit: SPADE,
+            },
+          ],
+        })
+      );
+
+      await gameService.updateRoundWinnner('lobby-1');
+
+      expect(transaction.getData().players.Player1.accumulated).toBe(4);
+      expect(transaction.getData().players.Player1.score).toBe(-90);
+      expect(transaction.getData().rounds.at(-1).players.Player1.accumulatedPenalty).toBe(100);
     });
   });
 });

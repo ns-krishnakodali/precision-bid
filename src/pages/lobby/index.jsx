@@ -505,7 +505,7 @@ export const LobbyPage = ({
                       </div>
                     </div>
                     <div className="rounded-3xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3">
-                      <p className="text-xs font-bold leading-relaxed text-slate-100">
+                      <p className="text-xs text-center font-bold leading-relaxed text-slate-100">
                         Win tricks with your partner. Spades are trump. Teams are picked randomly.
                       </p>
                     </div>
@@ -566,7 +566,7 @@ export const LobbyPage = ({
                       </div>
                     </div>
                     <div className="rounded-3xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3">
-                      <p className="text-xs font-bold leading-relaxed text-slate-100">
+                      <p className="text-xs text-center font-bold leading-relaxed text-slate-100">
                         Bid to control the round. Highest bidder leads, then everyone fights for
                         tricks.
                       </p>
@@ -626,12 +626,10 @@ export const LobbyPage = ({
                 <div className="mt-6 mb-3 flex items-center justify-center">
                   <Button
                     variant="primary"
-                    className="h-12 flex-1 max-w-90"
+                    className="h-12 flex-1 max-w-80"
                     onClick={() => setOpenGameInfoModal(false)}
                   >
-                    <span className="text-[11px] font-black uppercase tracking-[0.22em]">
-                      Got It
-                    </span>
+                    <span className="text-[18px] font-black uppercase tracking-widest">Got It</span>
                   </Button>
                 </div>
               </div>
