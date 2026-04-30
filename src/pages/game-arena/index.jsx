@@ -13,13 +13,13 @@ import {
   GAME_TYPE,
   HEART,
   JOKER,
-  POINTS,
   SELECT_TRUMP_STATUS,
   SPADE,
   SPADES_VARIANT,
   SUITE_META,
 } from '../../constants';
 import { gameService } from '../../services';
+import { getRoundScore, getSpadesTeamRoundSummary, getSpadesTeamScore } from '../../utils';
 
 const getSeatPosition = ({ totalSeats, seatIndex, xRadiusPercent, yRadiusPercent }) => {
   const angle = Math.PI / 2 - (Math.PI * 2 * seatIndex) / totalSeats;
@@ -228,6 +228,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
   const [toast, setToast] = useState(null);
   const [openScorecardModal, setOpenScoreCardModal] = useState(false);
   const [scoreHistoryPlayerName, setScoreHistoryPlayerName] = useState('');
+  const [scoreHistoryTeamName, setScoreHistoryTeamName] = useState('');
   const [bidCount, setBidCount] = useState('');
 
   const tableRef = useRef(null);
@@ -286,9 +287,12 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
         const partner = players[idx + halfPlayersCount];
         return {
           teamName: `Team ${idx + 1}`,
-          teamKey: `${player.name}-${partner.name}`,
+          playerNames: [player.name, partner.name],
           players: [player, partner],
-          score: (player.score ?? 0) + (partner.score ?? 0),
+          score: getSpadesTeamScore({
+            playerNames: [player.name, partner.name],
+            rounds: gameData.rounds,
+          }),
           accumulatedValues: [player.accumulated ?? 0, partner.accumulated ?? 0].sort(
             (value1, value2) => value1 - value2
           ),
@@ -300,7 +304,20 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
           team1.accumulatedValues[0] - team2.accumulatedValues[0] ||
           team1.accumulatedValues[1] - team2.accumulatedValues[1]
       );
-  }, [isSpadesGame, players]);
+  }, [gameData.rounds, isSpadesGame, players]);
+
+  const scoreHistoryTeam = useMemo(
+    () => spadesTeams.find((team) => team.teamName === scoreHistoryTeamName),
+    [scoreHistoryTeamName, spadesTeams]
+  );
+
+  const winningTeams = useMemo(
+    () =>
+      spadesTeams.filter((team) =>
+        team.playerNames.every((name) => (gameData.winnerNames ?? []).includes(name))
+      ),
+    [spadesTeams, gameData.winnerNames]
+  );
 
   // Variables
   const currentPlayer = players[gameData?.currentPlayerIdx ?? 0]?.name;
@@ -331,6 +348,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
   const isAnyModalOpen =
     openScorecardModal ||
     Boolean(scoreHistoryPlayerName) ||
+    Boolean(scoreHistoryTeamName) ||
     (gameData.roundStatus === BIDDING && isPlayerTurn) ||
     (gameData.roundStatus === SELECT_TRUMP_STATUS && isPlayerTurn) ||
     winnerNames.length > 0;
@@ -424,6 +442,11 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
     if (isLastPlay) {
       await gameService.updateTurnWinner(lobbyId);
     }
+  };
+
+  const handleScoreModalClosing = () => {
+    setScoreHistoryPlayerName('');
+    setScoreHistoryTeamName('');
   };
 
   return (
@@ -684,7 +707,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
           <button
             onClick={() => {
               setOpenScoreCardModal(false);
-              setScoreHistoryPlayerName('');
+              handleScoreModalClosing();
             }}
             className="absolute inset-0 bg-[#020617]/80 backdrop-blur-md"
             aria-label="Close scorecard"
@@ -713,7 +736,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                   aria-label="Close modal"
                   onClick={() => {
                     setOpenScoreCardModal(false);
-                    setScoreHistoryPlayerName('');
+                    handleScoreModalClosing();
                   }}
                 >
                   <X className="text-slate-300" size={18} />
@@ -723,7 +746,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                 {isSpadesGame
                   ? spadesTeams.map((team, idx) => (
                       <div
-                        key={team.teamKey}
+                        key={team.teamName}
                         className={`relative overflow-hidden rounded-2xl border p-4 transition-colors ${
                           idx === 0
                             ? 'border-cyan-500/20 bg-cyan-500/10'
@@ -753,11 +776,19 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                             </p>
                           </div>
                           <div className="shrink-0 text-right">
-                            <p
-                              className={`text-3xl font-black leading-none tabular-nums ${idx === 0 ? 'text-cyan-100' : 'text-white'}`}
+                            <button
+                              type="button"
+                              className={`rounded-xl px-2 py-1 text-3xl font-black leading-none tabular-nums transition-colors hover:bg-white/5 ${
+                                idx === 0 ? 'text-cyan-100' : 'text-white'
+                              }`}
+                              aria-label={`View ${team.teamName} round history`}
+                              onClick={() => {
+                                setScoreHistoryPlayerName('');
+                                setScoreHistoryTeamName(team.teamName);
+                              }}
                             >
                               {team.score}
-                            </p>
+                            </button>
                             <p className="mt-1 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
                               Team Points
                             </p>
@@ -808,7 +839,10 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                                   type="button"
                                   className="rounded-xl px-2 py-1 text-2xl font-black leading-none tabular-nums text-white transition-colors hover:bg-white/5"
                                   aria-label={`View ${teamPlayer.name} round history`}
-                                  onClick={() => setScoreHistoryPlayerName(teamPlayer.name)}
+                                  onClick={() => {
+                                    setScoreHistoryTeamName('');
+                                    setScoreHistoryPlayerName(teamPlayer.name);
+                                  }}
                                 >
                                   {teamPlayer.score}
                                 </button>
@@ -891,7 +925,10 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                                 idx === 0 ? 'text-cyan-100' : 'text-white'
                               }`}
                               aria-label={`View ${player.name} round history`}
-                              onClick={() => setScoreHistoryPlayerName(player.name)}
+                              onClick={() => {
+                                setScoreHistoryTeamName('');
+                                setScoreHistoryPlayerName(player.name);
+                              }}
                             >
                               {player.score}
                             </button>
@@ -905,10 +942,10 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
               </div>
             </div>
           </div>
-          {scoreHistoryPlayerName && (
+          {(scoreHistoryPlayerName || scoreHistoryTeam) && (
             <div className="fixed inset-0 z-100 flex items-start justify-center overflow-y-auto p-4 sm:items-center sm:p-6">
               <button
-                onClick={() => setScoreHistoryPlayerName('')}
+                onClick={handleScoreModalClosing}
                 className="absolute inset-0 bg-[#020617]/85 backdrop-blur-md"
                 aria-label="Close player history"
               />
@@ -918,7 +955,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                   sm:max-h-[calc(100dvh-5.5rem)] sm:rounded-[2.5rem]"
                 role="dialog"
                 aria-modal="true"
-                aria-label={`${scoreHistoryPlayerName} round history`}
+                aria-label={`${scoreHistoryTeam?.teamName ?? scoreHistoryPlayerName} round history`}
               >
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.16)_0%,transparent_55%)]" />
                 <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-400/60 to-transparent" />
@@ -929,7 +966,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                         Round History
                       </p>
                       <h3 className="mt-1 truncate text-2xl font-black tracking-tight text-white">
-                        {scoreHistoryPlayerName}
+                        {scoreHistoryTeam?.teamName ?? scoreHistoryPlayerName}
                       </h3>
                     </div>
                     <button
@@ -937,7 +974,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                       className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition-all
                        hover:bg-white/10 active:scale-95"
                       aria-label="Close history modal"
-                      onClick={() => setScoreHistoryPlayerName('')}
+                      onClick={handleScoreModalClosing}
                     >
                       <X className="text-slate-300" size={16} />
                     </button>
@@ -963,14 +1000,26 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                       </div>
                       <div className="divide-y divide-white/8">
                         {(gameData.rounds ?? []).map((round, roundIdx) => {
-                          const playerRound = round?.players?.[scoreHistoryPlayerName] ?? {};
-                          const bids = playerRound.bids ?? 0;
-                          const wins = playerRound.wins ?? 0;
+                          const roundSummary = scoreHistoryTeam
+                            ? getSpadesTeamRoundSummary({
+                                playerNames: scoreHistoryTeam.playerNames,
+                                roundPlayers: round?.players,
+                              })
+                            : {
+                                accumulatedPenalty:
+                                  round?.players?.[scoreHistoryPlayerName]?.accumulatedPenalty ?? 0,
+                                bids: round?.players?.[scoreHistoryPlayerName]?.bids ?? 0,
+                                score: getRoundScore({
+                                  accumulatedPenalty:
+                                    round?.players?.[scoreHistoryPlayerName]?.accumulatedPenalty ??
+                                    0,
+                                  bids: round?.players?.[scoreHistoryPlayerName]?.bids ?? 0,
+                                  wins: round?.players?.[scoreHistoryPlayerName]?.wins ?? 0,
+                                }),
+                                wins: round?.players?.[scoreHistoryPlayerName]?.wins ?? 0,
+                              };
                           const isCurrentRound = roundIdx === (gameData.rounds?.length ?? 1) - 1;
-                          const penalty = playerRound?.accumulatedPenalty ?? 0;
-                          const score = !isCurrentRound
-                            ? (wins < bids ? wins - bids : bids) * POINTS - penalty
-                            : 0;
+                          const score = !isCurrentRound ? roundSummary.score : 0;
 
                           return (
                             <div
@@ -993,19 +1042,25 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                                 </div>
                               </div>
                               <p className="text-center text-sm font-black tabular-nums text-slate-100 sm:text-base">
-                                {bids}
+                                {roundSummary.bids}
                               </p>
                               <p className="text-center text-sm font-black tabular-nums text-slate-100 sm:text-base">
-                                {wins}
+                                {roundSummary.wins}
                               </p>
                               <p className="text-center text-sm font-black tabular-nums sm:text-base">
-                                {penalty > 0 ? (
-                                  <span className="text-rose-300/80">-{penalty}</span>
+                                {roundSummary.accumulatedPenalty > 0 ? (
+                                  <span className="text-rose-300/80">
+                                    -{roundSummary.accumulatedPenalty}
+                                  </span>
                                 ) : (
                                   <span
-                                    className={`${wins > bids ? 'text-amber-200/70' : 'text-slate-100'}`}
+                                    className={`${
+                                      roundSummary.wins > roundSummary.bids
+                                        ? 'text-amber-200/70'
+                                        : 'text-slate-100'
+                                    }`}
                                   >
-                                    {Math.max(0, wins - bids)}
+                                    {Math.max(0, roundSummary.wins - roundSummary.bids)}
                                   </span>
                                 )}
                               </p>
@@ -1388,7 +1443,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                       </span>
                       <span className="text-sm font-black text-white tabular-nums">
                         {isSpadesGame
-                          ? (winningPlayers ?? []).reduce((acc, curr) => acc + curr?.score, 0)
+                          ? winningTeams.map((team) => team.score).join(' / ')
                           : winningPlayers[0]?.score}
                       </span>
                     </div>
@@ -1397,7 +1452,11 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                         Accumulated
                       </span>
                       <span className="text-sm font-black text-white tabular-nums">
-                        {winningPlayers[0]?.accumulated}
+                        {isSpadesGame
+                          ? winningTeams
+                              .map((team) => team.accumulatedValues.join(' / '))
+                              .join(' | ')
+                          : winningPlayers[0]?.accumulated}
                       </span>
                     </div>
                   </div>

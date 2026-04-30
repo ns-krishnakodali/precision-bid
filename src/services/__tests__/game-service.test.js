@@ -37,9 +37,14 @@ vi.mock('../../firebase', () => ({
   db: { mockDb: true },
 }));
 
-vi.mock('../../utils', () => ({
-  dealCards: vi.fn(),
-}));
+vi.mock('../../utils', async (importOriginal) => {
+  const actual = await importOriginal();
+
+  return {
+    ...actual,
+    dealCards: vi.fn(),
+  };
+});
 
 const deepClone = (value) =>
   typeof value === 'undefined' ? undefined : JSON.parse(JSON.stringify(value));
@@ -173,6 +178,29 @@ describe('gameService', () => {
       ]);
       expect(data.players.Player1.cards).toEqual([card('A', SPADE)]);
       expect(data.players.Player4.cards).toEqual([card('J', DIAMOND)]);
+    });
+
+    it('rotates the starting player by round number and recreates an invalid rounds collection', async () => {
+      const transaction = useTransactionData(
+        createLobby({
+          roundNumber: 2,
+          rounds: {},
+        })
+      );
+
+      await gameService.addNewRound('lobby-1');
+
+      const data = transaction.getData();
+      expect(data.currentPlayerIdx).toBe(2);
+      expect(data.roundNumber).toBe(3);
+      expect(data.rounds).toEqual([
+        {
+          currentTurn: 0,
+          players: createNewRoundPlayers(),
+          startPlayerIdx: 2,
+          trumpSuit: '',
+        },
+      ]);
     });
 
     it('caps Bid Whist Uptown rounds using 54 cards across the player count', async () => {
@@ -663,6 +691,47 @@ describe('gameService', () => {
       ]);
     });
 
+    it('starts Spades play after the last bot finishes the bidding cycle', async () => {
+      const players = createPlayers();
+      const transaction = useTransactionData(
+        createLobby({
+          currentPlayerIdx: 3,
+          players: {
+            ...players,
+            Player4: {
+              ...players.Player4,
+              cards: [card('A', SPADE), card('K', SPADE), card('Q', HEART)],
+              isBot: true,
+            },
+          },
+          roundNumber: 3,
+          roundStatus: BIDDING,
+          rounds: [
+            {
+              currentTurn: 0,
+              players: {
+                Player1: { bids: 1, hasBid: true, played: [], wins: 0 },
+                Player2: { bids: 1, hasBid: true, played: [], wins: 0 },
+                Player3: { bids: 0, hasBid: true, played: [], wins: 0 },
+                Player4: { bids: 0, played: [], wins: 0 },
+              },
+              startPlayerIdx: 0,
+              trumpSuit: '',
+            },
+          ],
+        })
+      );
+
+      await expect(gameService.processBotAction('lobby-1', 'Player1')).resolves.toBe(true);
+
+      const data = transaction.getData();
+      expect(data.rounds.at(-1).players.Player4.hasBid).toBe(true);
+      expect(data.currentPlayerIdx).toBe(0);
+      expect(data.rounds.at(-1).currentTurn).toBe(1);
+      expect(data.rounds.at(-1).trumpSuit).toBe(SPADE);
+      expect(data.roundStatus).toBe(GAME_STATUS);
+    });
+
     it('resolves the trick when the last play is a bot action', async () => {
       vi.useFakeTimers();
       const players = createPlayers();
@@ -706,7 +775,7 @@ describe('gameService', () => {
       expect(data.roundStatus).toBe(GAME_STATUS);
     });
 
-    it('skips missing data, human turns, already-played bot turns, and Firebase failures safely', async () => {
+    it('returns false for missing lobbies, human turns, and missing round-player data', async () => {
       const missingTransaction = useTransactionData(null);
       await expect(gameService.processBotAction('lobby-1', 'Player1')).resolves.toBe(false);
       expect(missingTransaction.getData()).toBeNull();
@@ -716,6 +785,56 @@ describe('gameService', () => {
       expect(humanTransaction.getData().rounds.at(-1).players.Player1.played).toEqual([]);
 
       const players = createPlayers();
+      const missingRoundPlayerTransaction = useTransactionData(
+        createLobby({
+          currentPlayerIdx: 1,
+          players: {
+            ...players,
+            Player2: { ...players.Player2, isBot: true },
+          },
+          rounds: [
+            {
+              currentTurn: 1,
+              players: {
+                Player1: createRoundPlayers().Player1,
+              },
+              startPlayerIdx: 0,
+              trumpSuit: SPADE,
+            },
+          ],
+        })
+      );
+      await expect(gameService.processBotAction('lobby-1', 'Player1')).resolves.toBe(false);
+      expect(missingRoundPlayerTransaction.getData().rounds.at(-1).players.Player1.played).toEqual(
+        []
+      );
+    });
+
+    it('does not repeat a bot action for the same game state or after a card is already recorded', async () => {
+      const players = createPlayers();
+      const duplicateBidTransaction = useTransactionData(
+        createLobby({
+          players: {
+            ...players,
+            Player1: { ...players.Player1, isBot: true },
+          },
+          roundStatus: BIDDING,
+          rounds: [
+            {
+              currentTurn: 0,
+              lastBotActionKey: `1:0:${BIDDING}:0:Player1`,
+              players: createNewRoundPlayers(),
+              startPlayerIdx: 0,
+              trumpSuit: '',
+            },
+          ],
+        })
+      );
+      await expect(gameService.processBotAction('lobby-1', 'Player1')).resolves.toBe(false);
+      expect(
+        duplicateBidTransaction.getData().rounds.at(-1).players.Player1.hasBid
+      ).toBeUndefined();
+
       const playedTransaction = useTransactionData(
         createLobby({
           players: {
@@ -738,8 +857,11 @@ describe('gameService', () => {
       expect(playedTransaction.getData().rounds.at(-1).players.Player1.played).toEqual([
         card('A', SPADE),
       ]);
+    });
 
+    it('propagates Firebase failures', async () => {
       runTransaction.mockRejectedValueOnce(new Error('bot transaction failed'));
+
       await expect(gameService.processBotAction('lobby-1', 'Player1')).rejects.toThrow(
         'bot transaction failed'
       );
@@ -838,6 +960,38 @@ describe('gameService', () => {
       expect(transaction.getData().rounds.at(-1).players.Player2.wins).toBe(1);
     });
 
+    it('finds the winning card even when the start player has no card recorded for the trick', async () => {
+      vi.useFakeTimers();
+      const transaction = useTransactionData(
+        createLobby({
+          roundNumber: 3,
+          rounds: [
+            {
+              currentTurn: 1,
+              players: createRoundPlayers({
+                Player1: { played: [] },
+                Player2: { played: [card('K', HEART)] },
+                Player3: { played: [card('A', HEART)] },
+                Player4: { played: [card('Q', HEART)] },
+              }),
+              startPlayerIdx: 0,
+              trumpSuit: '',
+            },
+          ],
+        })
+      );
+
+      const updatePromise = gameService.updateTurnWinner('lobby-1');
+      await vi.advanceTimersByTimeAsync(1200);
+      await updatePromise;
+
+      const data = transaction.getData();
+      expect(data.rounds.at(-1).players.Player3.wins).toBe(1);
+      expect(data.rounds.at(-1).startPlayerIdx).toBe(2);
+      expect(data.currentPlayerIdx).toBe(2);
+      expect(data.rounds.at(-1).currentTurn).toBe(2);
+    });
+
     it('finalizes scores and winners when the last turn of the last round completes', async () => {
       vi.useFakeTimers();
       const transaction = useTransactionData(
@@ -873,7 +1027,7 @@ describe('gameService', () => {
       expect(transaction.states[0].roundStatus).toBe(GAME_OVER_STATUS);
       expect(transaction.states[0].statusText).toBe(FINALIZING_RESULTS_MESSAGE);
       expect(data.roundStatus).toBe(GAME_OVER_STATUS);
-      expect(data.winnerNames).toEqual(['Player2', 'Player4']);
+      expect(data.winnerNames).toEqual(['Player1', 'Player3', 'Player2', 'Player4']);
       expect(data.rounds.at(-1).players.Player1.wins).toBe(1);
     });
 
@@ -1005,29 +1159,33 @@ describe('gameService', () => {
   });
 
   describe('updateRoundWinnner', () => {
-    it('scores exact, under, over, accumulated-penalty, and missing bid cases', async () => {
+    it('scores exact, under, over, accumulated-penalty, and incomplete round entries', async () => {
       const transaction = useTransactionData(
         createLobby({
+          gameType: GAME_TYPE.BID_WHIST,
           players: {
             Player1: { accumulated: 0, cards: [], orderIdx: 0, score: 0 },
             Player2: { accumulated: 4, cards: [], orderIdx: 1, score: 15 },
             Player3: { accumulated: 1, cards: [], orderIdx: 2, score: 30 },
             Player4: { accumulated: 0, cards: [], orderIdx: 3, score: 5 },
+            Player5: { accumulated: 2, cards: [], orderIdx: 4, score: 40 },
           },
           roundNumber: MAX_ROUNDS,
           rounds: [
             {
               currentTurn: 1,
-              players: createRoundPlayers({
+              players: createRoundPlayersByCount(5, {
                 Player1: { bids: 2, wins: 2 },
                 Player2: { bids: 1, wins: 3 },
                 Player3: { bids: 3, wins: 1 },
                 Player4: { bids: undefined, wins: 2 },
+                Player5: { bids: 2, wins: undefined },
               }),
               startPlayerIdx: 0,
-              trumpSuit: SPADE,
+              trumpSuit: '',
             },
           ],
+          variant: BID_WHIST_VARIANT.NO_TRUMP,
         })
       );
 
@@ -1038,10 +1196,12 @@ describe('gameService', () => {
       expect(data.players.Player2).toMatchObject({ accumulated: 1, score: -25 });
       expect(data.players.Player3).toMatchObject({ accumulated: 1, score: 10 });
       expect(data.players.Player4).toMatchObject({ accumulated: 0, score: 5 });
+      expect(data.players.Player5).toMatchObject({ accumulated: 2, score: 40 });
       expect(data.rounds.at(-1).players.Player1.accumulatedPenalty).toBeUndefined();
       expect(data.rounds.at(-1).players.Player2.accumulatedPenalty).toBe(50);
       expect(data.rounds.at(-1).players.Player3.accumulatedPenalty).toBeUndefined();
       expect(data.rounds.at(-1).players.Player4.accumulatedPenalty).toBeUndefined();
+      expect(data.rounds.at(-1).players.Player5.accumulatedPenalty).toBeUndefined();
     });
 
     it('selects individual winners by score and lower accumulated value', async () => {
@@ -1128,22 +1288,159 @@ describe('gameService', () => {
       expect(dealCards).toHaveBeenCalledWith(7, Math.floor(MAX_CARDS / 7), false);
     });
 
-    it('selects Spades winners by opposite-seat team score', async () => {
+    it('selects Spades winners from aggregated team round scoring instead of cumulative player scores', async () => {
       const transaction = useTransactionData(
         createLobby({
           players: {
-            Player1: { accumulated: 0, cards: [], orderIdx: 0, score: 40 },
-            Player2: { accumulated: 0, cards: [], orderIdx: 1, score: 50 },
-            Player3: { accumulated: 0, cards: [], orderIdx: 2, score: 30 },
-            Player4: { accumulated: 0, cards: [], orderIdx: 3, score: 10 },
+            Player1: { accumulated: 0, cards: [], orderIdx: 0, score: 0 },
+            Player2: { accumulated: 0, cards: [], orderIdx: 1, score: 100 },
+            Player3: { accumulated: 0, cards: [], orderIdx: 2, score: 0 },
+            Player4: { accumulated: 0, cards: [], orderIdx: 3, score: 100 },
           },
           roundNumber: MAX_ROUNDS,
+          rounds: [
+            {
+              currentTurn: 1,
+              players: createRoundPlayers({
+                Player1: { bids: 1, wins: 2 },
+                Player2: { bids: 1, wins: 0 },
+                Player3: { bids: 1, wins: 0 },
+                Player4: { bids: 1, wins: 0 },
+              }),
+              startPlayerIdx: 0,
+              trumpSuit: SPADE,
+            },
+          ],
         })
       );
 
       await gameService.updateRoundWinnner('lobby-1');
 
       expect(transaction.getData().winnerNames).toEqual(['Player1', 'Player3']);
+    });
+
+    it('factors aggregated teammate penalties into Spades winner selection', async () => {
+      const transaction = useTransactionData(
+        createLobby({
+          players: {
+            Player1: { accumulated: MAX_ACCUMULATED - 1, cards: [], orderIdx: 0, score: 0 },
+            Player2: { accumulated: 0, cards: [], orderIdx: 1, score: 0 },
+            Player3: { accumulated: 0, cards: [], orderIdx: 2, score: 0 },
+            Player4: { accumulated: 0, cards: [], orderIdx: 3, score: 0 },
+          },
+          roundNumber: MAX_ROUNDS,
+          rounds: [
+            {
+              currentTurn: 1,
+              players: createRoundPlayers({
+                Player1: { bids: 0, wins: 1 },
+                Player2: { bids: 1, wins: 1 },
+                Player3: { bids: 1, wins: 0 },
+                Player4: { bids: 0, wins: 0 },
+              }),
+              startPlayerIdx: 0,
+              trumpSuit: SPADE,
+            },
+          ],
+        })
+      );
+
+      await gameService.updateRoundWinnner('lobby-1');
+
+      expect(transaction.getData().rounds.at(-1).players.Player1.accumulatedPenalty).toBe(50);
+      expect(transaction.getData().winnerNames).toEqual(['Player2', 'Player4']);
+    });
+
+    it('uses lower accumulated values as the Spades team tiebreak when team scores match', async () => {
+      const transaction = useTransactionData(
+        createLobby({
+          players: {
+            Player1: { accumulated: 0, cards: [], orderIdx: 0, score: 0 },
+            Player2: { accumulated: 0, cards: [], orderIdx: 1, score: 0 },
+            Player3: { accumulated: 1, cards: [], orderIdx: 2, score: 0 },
+            Player4: { accumulated: 2, cards: [], orderIdx: 3, score: 0 },
+          },
+          roundNumber: MAX_ROUNDS,
+          rounds: [
+            {
+              currentTurn: 1,
+              players: createRoundPlayers({
+                Player1: { bids: 1, wins: 1 },
+                Player2: { bids: 1, wins: 1 },
+                Player3: { bids: 1, wins: 1 },
+                Player4: { bids: 1, wins: 1 },
+              }),
+              startPlayerIdx: 0,
+              trumpSuit: SPADE,
+            },
+          ],
+        })
+      );
+
+      await gameService.updateRoundWinnner('lobby-1');
+
+      expect(transaction.getData().winnerNames).toEqual(['Player1', 'Player3']);
+    });
+
+    it('declares both Spades teams winners when team score, penalties, and accumulated values tie', async () => {
+      const transaction = useTransactionData(
+        createLobby({
+          players: {
+            Player1: { accumulated: 0, cards: [], orderIdx: 0, score: 0 },
+            Player2: { accumulated: 0, cards: [], orderIdx: 1, score: 0 },
+            Player3: { accumulated: 1, cards: [], orderIdx: 2, score: 0 },
+            Player4: { accumulated: 1, cards: [], orderIdx: 3, score: 0 },
+          },
+          roundNumber: MAX_ROUNDS,
+          rounds: [
+            {
+              currentTurn: 1,
+              players: createRoundPlayers({
+                Player1: { bids: 1, wins: 1 },
+                Player2: { bids: 1, wins: 1 },
+                Player3: { bids: 1, wins: 1 },
+                Player4: { bids: 1, wins: 1 },
+              }),
+              startPlayerIdx: 0,
+              trumpSuit: SPADE,
+            },
+          ],
+        })
+      );
+
+      await gameService.updateRoundWinnner('lobby-1');
+
+      expect(transaction.getData().winnerNames).toEqual([
+        'Player1',
+        'Player3',
+        'Player2',
+        'Player4',
+      ]);
+    });
+
+    it('falls back to individual winners when Spades teams cannot be formed from the player list', async () => {
+      const transaction = useTransactionData(
+        createLobby({
+          players: {
+            Player1: { accumulated: 1, cards: [], orderIdx: 0, score: 80 },
+            Player2: { accumulated: 0, cards: [], orderIdx: 1, score: 70 },
+            Player3: { accumulated: 0, cards: [], orderIdx: 2, score: 80 },
+          },
+          roundNumber: MAX_ROUNDS,
+          rounds: [
+            {
+              currentTurn: 1,
+              players: createRoundPlayersByCount(3),
+              startPlayerIdx: 0,
+              trumpSuit: SPADE,
+            },
+          ],
+        })
+      );
+
+      await gameService.updateRoundWinnner('lobby-1');
+
+      expect(transaction.getData().winnerNames).toEqual(['Player3']);
     });
 
     it('adds a new round after scoring when the game is not over', async () => {

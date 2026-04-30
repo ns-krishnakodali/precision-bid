@@ -26,7 +26,7 @@ import {
   TURN_START_MESSAGE,
 } from '../constants';
 import { db } from '../firebase';
-import { dealCards } from '../utils';
+import { dealCards, getSpadesTeamScore } from '../utils';
 
 // Private Methods
 
@@ -66,7 +66,7 @@ const getCardSuit = (card) => card?.suit ?? card?.type ?? '';
 const getEffectiveSuit = (card, currentRound) =>
   getCardSuit(card) === JOKER ? currentRound.trumpSuit : getCardSuit(card);
 
-const getSpadesTeams = (players = {}) => {
+const getSpadesTeams = (players = {}, rounds = []) => {
   const orderedPlayers = Object.entries(players).sort(
     ([, playerDetails1], [, playerDetails2]) =>
       Number(playerDetails1?.orderIdx ?? 0) - Number(playerDetails2?.orderIdx ?? 0)
@@ -76,9 +76,10 @@ const getSpadesTeams = (players = {}) => {
 
   return orderedPlayers.slice(0, halfPlayersCount).map(([playerName, playerDetails], idx) => {
     const [partnerName, partnerDetails] = orderedPlayers[idx + halfPlayersCount];
+
     return {
       playerNames: [playerName, partnerName],
-      score: (playerDetails?.score ?? 0) + (partnerDetails?.score ?? 0),
+      score: getSpadesTeamScore({ playerNames: [playerName, partnerName], rounds }),
       accumulatedValues: [playerDetails?.accumulated ?? 0, partnerDetails?.accumulated ?? 0].sort(
         (value1, value2) => value1 - value2
       ),
@@ -818,7 +819,7 @@ const updateRoundWinnner = async (lobbyId) => {
     roundNumber = lobbyData.roundNumber;
     if (roundNumber >= maxRounds) {
       if (lobbyData.gameType === GAME_TYPE.SPADES) {
-        const teams = getSpadesTeams(lobbyData.players);
+        const teams = getSpadesTeams(lobbyData.players, lobbyData.rounds);
         let winnerTeams = [];
         let winningScore = Number.NEGATIVE_INFINITY;
         let winningAccumulatedValues = [];
