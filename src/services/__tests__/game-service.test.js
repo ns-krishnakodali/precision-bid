@@ -345,6 +345,65 @@ describe('gameService', () => {
       expect(data.rounds.at(-1).trumpSuit).toBe('');
     });
 
+    it('breaks tied bids by round start order before trump selection', async () => {
+      const transaction = useTransactionData(
+        createLobby({
+          gameType: GAME_TYPE.BID_WHIST,
+          rounds: [
+            {
+              currentTurn: 0,
+              players: createRoundPlayers({
+                Player1: { bids: 2 },
+                Player2: { bids: 2 },
+                Player3: { bids: 2 },
+                Player4: { bids: 2 },
+              }),
+              startPlayerIdx: 2,
+              trumpSuit: '',
+            },
+          ],
+          variant: BID_WHIST_VARIANT.UPTOWN,
+        })
+      );
+
+      await gameService.updateRoundTrump('lobby-1', undefined);
+
+      const data = transaction.getData();
+      expect(data.currentPlayerIdx).toBe(2);
+      expect(data.roundStatus).toBe(SELECT_TRUMP_STATUS);
+      expect(data.rounds.at(-1).startPlayerIdx).toBe(2);
+    });
+
+    it('keeps tied no-trump bids with the first bidder in round order', async () => {
+      const transaction = useTransactionData(
+        createLobby({
+          gameType: GAME_TYPE.BID_WHIST,
+          rounds: [
+            {
+              currentTurn: 0,
+              players: createRoundPlayers({
+                Player1: { bids: 2 },
+                Player2: { bids: 2 },
+                Player3: { bids: 2 },
+                Player4: { bids: 2 },
+              }),
+              startPlayerIdx: 3,
+              trumpSuit: '',
+            },
+          ],
+          variant: BID_WHIST_VARIANT.NO_TRUMP,
+        })
+      );
+
+      await gameService.updateRoundTrump('lobby-1', '');
+
+      const data = transaction.getData();
+      expect(data.currentPlayerIdx).toBe(3);
+      expect(data.roundStatus).toBe(GAME_STATUS);
+      expect(data.rounds.at(-1).currentTurn).toBe(1);
+      expect(data.rounds.at(-1).startPlayerIdx).toBe(3);
+    });
+
     it('rejects null trump values while preserving Firebase error propagation', async () => {
       useTransactionData(createLobby());
       await expect(gameService.updateRoundTrump('lobby-1', null)).rejects.toThrow(

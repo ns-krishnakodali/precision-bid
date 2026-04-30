@@ -35,7 +35,19 @@ const getBidWinner = (currentRound, lobbyPlayers) => {
     (playerName1, playerName2) =>
       Number(lobbyPlayers[playerName1]?.orderIdx) - Number(lobbyPlayers[playerName2]?.orderIdx)
   );
-  for (const playerName of orderedPlayerNames) {
+  const firstBidderIdx = orderedPlayerNames.findIndex(
+    (playerName) =>
+      Number(lobbyPlayers[playerName]?.orderIdx) === Number(currentRound?.startPlayerIdx ?? 0)
+  );
+  const biddingOrderPlayerNames =
+    firstBidderIdx === -1
+      ? orderedPlayerNames
+      : [
+          ...orderedPlayerNames.slice(firstBidderIdx),
+          ...orderedPlayerNames.slice(0, firstBidderIdx),
+        ];
+
+  for (const playerName of biddingOrderPlayerNames) {
     const playerBid = Number(currentRound.players[playerName].bids ?? 0);
     if (!bidWinner || playerBid > highestBid) {
       bidWinner = playerName;

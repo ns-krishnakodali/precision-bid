@@ -28,6 +28,16 @@ const getSeatPosition = ({ totalSeats, seatIndex, xRadiusPercent, yRadiusPercent
   return { angle, x, y };
 };
 
+const getEffectiveSuit = (card, currentRound) => {
+  const suit = card?.suit ?? card?.type ?? '';
+
+  if (suit === JOKER && currentRound?.trumpSuit) {
+    return currentRound.trumpSuit;
+  }
+
+  return suit;
+};
+
 const ActionButton = ({ children, onClick, variant = 'secondary', className = '' }) => {
   const base =
     'relative overflow-hidden p-3 rounded-xl font-black transition-all duration-300 flex items-center justify-center gap-2 active:scale-95';
@@ -101,19 +111,19 @@ const PlayingCard = ({ card, size = 'md', className = '' }) => {
 const PlayerCard = ({ player, isPlayerTurn = false, isTurnStarter = false }) => {
   const bids = player.bids ?? 0;
   const wins = player.wins ?? 0;
-  const met = bids > 0 && wins >= bids;
 
   return (
     <div
-      className={`relative rounded-xl border backdrop-blur-xl px-2.5 py-1.5 shadow-[0_10px_25px_rgba(0,0,0,0.5)] w-full min-w-0 sm:w-30 flex flex-col items-center text-center ${
-        isPlayerTurn
-          ? 'bg-cyan-500/20 border-cyan-400/50 shadow-[0_0_22px_rgba(6,182,212,0.35)]'
-          : 'bg-slate-950/80 border-white/15'
-      } transition-[background-color,border-color,box-shadow,color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]`}
+      className={`relative rounded-xl border backdrop-blur-xl px-2.5 py-1.5 shadow-[0_10px_25px_rgba(0,0,0,0.5)] w-full min-w-0 sm:w-32 flex flex-col items-center
+        text-center transition-[background-color,border-color,box-shadow,color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          isPlayerTurn
+            ? 'bg-cyan-500/20 border-cyan-400/50 shadow-[0_0_22px_rgba(6,182,212,0.35)]'
+            : 'bg-slate-950/80 border-white/15'
+        }`}
     >
       {isTurnStarter && (
         <div
-          className="absolute right-2 top-1.6 flex h-5 w-5 items-center justify-center rounded-full border border-cyan-400/25 bg-slate-950/85
+          className="absolute right-2 top-1 sm:top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-cyan-400/25 bg-slate-950/85
             shadow-[0_0_12px_rgba(6,182,212,0.2)] sm:h-4.5 sm:w-4.5"
           title="Started this turn"
         >
@@ -145,7 +155,7 @@ const PlayerCard = ({ player, isPlayerTurn = false, isTurnStarter = false }) => 
           <p className="text-[7px] text-slate-400 font-black uppercase tracking-[0.18em]">Wins</p>
           <p
             className={`mt-0.5 text-xs sm:text-sm font-black tabular-nums ${
-              met ? 'text-emerald-300' : 'text-white'
+              bids > 0 && wins >= bids ? 'text-emerald-300' : 'text-white'
             } transition-colors duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]`}
           >
             {wins}
@@ -160,8 +170,8 @@ const GameSeat = ({ player, totalSeats, seatIndex, playedCard, isPlayerTurn, isT
   const playersPosition = getSeatPosition({
     totalSeats,
     seatIndex,
-    xRadiusPercent: 37,
-    yRadiusPercent: 31,
+    xRadiusPercent: 36.7,
+    yRadiusPercent: 31.5,
   });
   const hasPlayedCard = Object.keys(playedCard ?? {}).length > 0;
 
@@ -297,14 +307,19 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
   const currentPlayerDetails = gameData.players.find((player) => player.name === currentPlayer);
   const isHost = gameData.host === playerName;
   const isPlayerTurn = currentPlayer === playerName;
-  const leadSuit =
+  const leadCard =
     Number(currentRound?.currentTurn ?? 0) - 1 >= 0
-      ? (currentRound.players?.[players[currentRound?.startPlayerIdx ?? -1]?.name]?.played?.[
+      ? currentRound.players?.[players[currentRound?.startPlayerIdx ?? -1]?.name]?.played?.[
           Number(currentRound?.currentTurn ?? 0) - 1
-        ]?.suit ?? '')
-      : '';
+        ]
+      : null;
+  const leadSuit =
+    Number(currentRound?.currentTurn ?? 0) - 1 >= 0 ? getEffectiveSuit(leadCard, currentRound) : '';
   const restrictedSuit =
-    leadSuit && playerHand.some((cardDetails) => cardDetails.suit === leadSuit) ? leadSuit : '';
+    leadSuit &&
+    playerHand.some((cardDetails) => getEffectiveSuit(cardDetails, currentRound) === leadSuit)
+      ? leadSuit
+      : '';
   const isBidValid =
     bidCount !== '' &&
     Number.isInteger(Number(bidCount)) &&
@@ -312,6 +327,13 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
     Number(bidCount) <= playerHand.length;
   const winnerNames = gameData.winnerNames ?? [];
   const winningPlayers = players.filter((player) => winnerNames.includes(player.name));
+  const placedBids = players.filter((player) => currentRound?.players?.[player.name]?.hasBid);
+  const isAnyModalOpen =
+    openScorecardModal ||
+    Boolean(scoreHistoryPlayerName) ||
+    (gameData.roundStatus === BIDDING && isPlayerTurn) ||
+    (gameData.roundStatus === SELECT_TRUMP_STATUS && isPlayerTurn) ||
+    winnerNames.length > 0;
 
   useEffect(() => {
     if (!isHost || !currentPlayerDetails?.isBot || winnerNames.length > 0) return undefined;
@@ -344,6 +366,15 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
 
     return () => cancelAnimationFrame(frame);
   }, [winnerNames.length]);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = isAnyModalOpen ? 'hidden' : previousOverflow;
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isAnyModalOpen]);
 
   // Handler methods
   const handleUserBid = async () => {
@@ -620,7 +651,8 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                         disabled={
                           gameData.roundStatus === BIDDING ||
                           !isPlayerTurn ||
-                          (restrictedSuit !== '' && cardDetails.suit !== restrictedSuit)
+                          (restrictedSuit !== '' &&
+                            getEffectiveSuit(cardDetails, currentRound) !== restrictedSuit)
                         }
                         className="rounded-xl motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-300 transition-all
                           duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2
@@ -983,7 +1015,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
       )}
       {gameData.roundStatus === BIDDING && isPlayerTurn && (
         <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 sm:p-6 overflow-y-auto">
-          <div className="absolute inset-0 bg-[#020617]/80 backdrop-blur-md" />
+          <div className="absolute inset-0 bg-[#020617]/80 backdrop-blur-lg" />
           <div
             className="w-full max-w-5xl relative z-10 bg-slate-900/40 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] shadow-[0_30px_120px_rgba(0,0,0,0.65)]
               overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3rem)]"
@@ -1002,6 +1034,32 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
               </div>
               <div className="mt-7 grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8 flex-1 min-h-0">
                 <div className="lg:col-span-2">
+                  <div className="mb-4 rounded-4xl border border-white/5 bg-slate-950/35 p-4 shadow-[0_20px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-[0.35em] text-slate-500">
+                          Highest bid so far
+                        </p>
+                        <p className="mt-2 text-sm font-black tracking-wide text-slate-300">
+                          {placedBids.length} of {players.length} played
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-4xl font-black leading-none tabular-nums text-cyan-100">
+                          {placedBids.length > 0
+                            ? placedBids.reduce(
+                                (highestBid, player) =>
+                                  Math.max(highestBid, Number(player.bids ?? 0)),
+                                0
+                              )
+                            : '--'}
+                        </p>
+                        <p className="mt-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                          {placedBids.length > 0 ? 'Highest bid' : 'No bids yet'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                   <div className="p-5 sm:p-6 rounded-4xl bg-slate-950/35 border border-white/5 backdrop-blur-xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
                     <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.35em]">
                       Number of bids
@@ -1118,7 +1176,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
       )}
       {gameData.roundStatus === SELECT_TRUMP_STATUS && isPlayerTurn && (
         <div className="fixed inset-0 z-60 flex items-start sm:items-center justify-center p-4 sm:p-6 overflow-y-auto">
-          <div className="absolute inset-0 bg-[#020617]/80 backdrop-blur-md" />
+          <div className="absolute inset-0 bg-[#020617]/80 backdrop-blur-lg" />
           <div
             className="w-full max-w-xl relative z-10 bg-slate-900/40 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] shadow-[0_30px_120px_rgba(0,0,0,0.65)]
               overflow-hidden animate-in fade-in zoom-in-95 duration-200"
