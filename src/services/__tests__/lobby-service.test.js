@@ -167,7 +167,7 @@ describe('lobbyService', () => {
           GAME_TYPE.SPADES
         )
       ).rejects.toThrow(
-        `${BOT_NAME_PREFIX} 1 through ${BOT_NAME_PREFIX} ${BOT_NAME_LIMIT} are reserved names.`
+        `${BOT_NAME_PREFIX} 1 through ${BOT_NAME_PREFIX} ${BOT_NAME_LIMIT} are reserved names`
       );
 
       expect(push).not.toHaveBeenCalled();
@@ -210,7 +210,7 @@ describe('lobbyService', () => {
 
       await expect(
         lobbyService.createGameSession('Player1', '1111', GAME_TYPE.SPADES)
-      ).rejects.toThrow('Failed to allocate lobby id.');
+      ).rejects.toThrow('Failed to allocate lobby id');
       expect(set).not.toHaveBeenCalled();
     });
 
@@ -219,7 +219,7 @@ describe('lobbyService', () => {
 
       await expect(
         lobbyService.createGameSession('Player1', '1111', GAME_TYPE.SPADES)
-      ).rejects.toThrow('Failed to allocate a unique game code.');
+      ).rejects.toThrow('Failed to allocate a unique game code');
       expect(generateUniqueCode).toHaveBeenCalledTimes(MAX_ATTEMPTS);
       expect(set).not.toHaveBeenCalled();
     });
@@ -260,7 +260,7 @@ describe('lobbyService', () => {
       await expect(
         lobbyService.joinGameSession('PLAY01', ` ${BOT_NAME_PREFIX} ${BOT_NAME_LIMIT} `, '3333')
       ).resolves.toEqual({
-        error: `${BOT_NAME_PREFIX} 1 through ${BOT_NAME_PREFIX} ${BOT_NAME_LIMIT} are reserved names.`,
+        error: `${BOT_NAME_PREFIX} 1 through ${BOT_NAME_PREFIX} ${BOT_NAME_LIMIT} are reserved names`,
         lobbyId: '',
       });
 
@@ -282,11 +282,11 @@ describe('lobbyService', () => {
       get.mockResolvedValue(snapshot(null, false));
 
       await expect(lobbyService.joinGameSession('MISS01', 'Player3', '3333')).resolves.toEqual({
-        error: 'Game not found.',
+        error: 'Game not found',
         lobbyId: '',
       });
       await expect(lobbyService.joinGameSession('', 'Player3', '3333')).resolves.toEqual({
-        error: 'Game not found.',
+        error: 'Game not found',
         lobbyId: '',
       });
     });
@@ -295,7 +295,7 @@ describe('lobbyService', () => {
       get.mockResolvedValueOnce(snapshot('lobby-1')).mockResolvedValueOnce(snapshot(null, false));
 
       await expect(lobbyService.joinGameSession('PLAY01', 'Player3', '3333')).resolves.toEqual({
-        error: 'Game not found.',
+        error: 'Game not found',
         lobbyId: '',
       });
     });
@@ -315,7 +315,7 @@ describe('lobbyService', () => {
       );
 
       await expect(lobbyService.joinGameSession('PLAY01', 'Player5', '5555')).resolves.toEqual({
-        error: 'Lobby is full.',
+        error: 'Lobby is full',
         lobbyId: '',
       });
       expect(update).not.toHaveBeenCalled();
@@ -327,7 +327,7 @@ describe('lobbyService', () => {
         .mockResolvedValueOnce(snapshot(createLobby({ status: LOBBY_STATUS.IN_GAME })));
 
       await expect(lobbyService.joinGameSession('PLAY01', 'Player3', '3333')).resolves.toEqual({
-        error: 'Game has already started.',
+        error: 'Game has already started',
         lobbyId: '',
       });
     });
@@ -336,7 +336,7 @@ describe('lobbyService', () => {
       get.mockResolvedValueOnce(snapshot('lobby-1')).mockResolvedValueOnce(snapshot(createLobby()));
 
       await expect(lobbyService.joinGameSession('PLAY01', 'Player1', '9999')).resolves.toEqual({
-        error: 'Invalid details, try again.',
+        error: 'Invalid details, try again',
         lobbyId: '',
       });
     });
@@ -526,7 +526,7 @@ describe('lobbyService', () => {
     });
 
     it('throws for missing ids and propagates Firebase failures', async () => {
-      await expect(lobbyService.addBot('')).rejects.toThrow('Missing lobbyId.');
+      await expect(lobbyService.addBot('')).rejects.toThrow('Missing lobbyId');
 
       runTransaction.mockRejectedValueOnce(new Error('bot add failed'));
       await expect(lobbyService.addBot('lobby-1')).rejects.toThrow('bot add failed');
@@ -575,7 +575,7 @@ describe('lobbyService', () => {
       get.mockResolvedValue(snapshot(null, false));
 
       await expect(lobbyService.startGame('lobby-1', SPADES_VARIANT.CLASSIC)).rejects.toThrow(
-        'Game session not found.'
+        'Game session not found'
       );
     });
 
@@ -583,7 +583,7 @@ describe('lobbyService', () => {
       get.mockResolvedValue(snapshot(createLobby({ players: {} })));
 
       await expect(lobbyService.startGame('lobby-1', SPADES_VARIANT.CLASSIC)).rejects.toThrow(
-        'No players found in lobby.'
+        'No players found in lobby'
       );
     });
 
@@ -591,7 +591,7 @@ describe('lobbyService', () => {
       get.mockResolvedValue(snapshot(createLobby()));
 
       await expect(lobbyService.startGame('lobby-1', 'Broken Variant')).rejects.toThrow(
-        'Invalid variant. Please select a valid game variant before starting.'
+        'Invalid variant. Please select a valid game variant before starting'
       );
     });
 

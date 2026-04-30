@@ -349,7 +349,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
   const handleUserBid = async () => {
     if (!isBidValid) {
       setToast({
-        message: `Enter a valid bid between 0 and ${playerHand.length}.`,
+        message: `Enter a valid bid between 0 and ${playerHand.length}`,
         type: 'error',
       });
       return;

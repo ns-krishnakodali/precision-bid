@@ -46,11 +46,11 @@ const getLobbyIdByCode = async (gameCode) => {
 const createGameSession = async (playerName, playerPin, gameType) => {
   if (isReservedBotName(playerName))
     throw new Error(
-      `${BOT_NAME_PREFIX} 1 through ${BOT_NAME_PREFIX} ${BOT_NAME_LIMIT} are reserved names.`
+      `${BOT_NAME_PREFIX} 1 through ${BOT_NAME_PREFIX} ${BOT_NAME_LIMIT} are reserved names`
     );
 
   const lobbyId = push(ref(db, 'lobby')).key;
-  if (!lobbyId) throw new Error('Failed to allocate lobby id.');
+  if (!lobbyId) throw new Error('Failed to allocate lobby id');
 
   let gameCode = '';
 
@@ -64,7 +64,7 @@ const createGameSession = async (playerName, playerPin, gameType) => {
     }
   }
 
-  if (!gameCode) throw new Error('Failed to allocate a unique game code.');
+  if (!gameCode) throw new Error('Failed to allocate a unique game code');
 
   await set(ref(db, `lobby/${lobbyId}`), {
     gameCode,
@@ -90,7 +90,7 @@ const createGameSession = async (playerName, playerPin, gameType) => {
 const joinGameSession = async (gameCode, playerName, playerPin) => {
   if (isReservedBotName(playerName))
     return {
-      error: `${BOT_NAME_PREFIX} 1 through ${BOT_NAME_PREFIX} ${BOT_NAME_LIMIT} are reserved names.`,
+      error: `${BOT_NAME_PREFIX} 1 through ${BOT_NAME_PREFIX} ${BOT_NAME_LIMIT} are reserved names`,
       lobbyId: '',
     };
 
@@ -98,10 +98,10 @@ const joinGameSession = async (gameCode, playerName, playerPin) => {
     .trim()
     .toUpperCase();
   const lobbyId = await getLobbyIdByCode(normalizedCode);
-  if (!lobbyId) return { error: 'Game not found.', lobbyId: '' };
+  if (!lobbyId) return { error: 'Game not found', lobbyId: '' };
 
   const snapshot = await get(ref(db, `lobby/${lobbyId}`));
-  if (!snapshot.exists()) return { error: 'Game not found.', lobbyId: '' };
+  if (!snapshot.exists()) return { error: 'Game not found', lobbyId: '' };
 
   const lobbyData = snapshot.val();
 
@@ -110,13 +110,13 @@ const joinGameSession = async (gameCode, playerName, playerPin) => {
 
   if (!playerObj) {
     if (Object.keys(players).length >= (GAME_CONFIG[lobbyData.gameType]?.maxPlayers ?? 4)) {
-      return { error: 'Lobby is full.', lobbyId: '' };
+      return { error: 'Lobby is full', lobbyId: '' };
     }
     if (lobbyData.status === LOBBY_STATUS.IN_GAME) {
-      return { error: 'Game has already started.', lobbyId: '' };
+      return { error: 'Game has already started', lobbyId: '' };
     }
     if (lobbyData.status === LOBBY_STATUS.CANCELLED) {
-      return { error: 'Game has been cancelled.', lobbyId: '' };
+      return { error: 'Game has been cancelled', lobbyId: '' };
     }
 
     await update(ref(db, `lobby/${lobbyId}/players`), {
@@ -128,7 +128,7 @@ const joinGameSession = async (gameCode, playerName, playerPin) => {
       },
     });
   } else if (String(playerObj.pin ?? '') !== String(playerPin ?? '')) {
-    return { error: 'Invalid details, try again.', lobbyId: '' };
+    return { error: 'Invalid details, try again', lobbyId: '' };
   }
 
   return { error: '', lobbyId };
@@ -174,7 +174,7 @@ const removePlayer = async (lobbyId, playerName) => {
 };
 
 const addBot = async (lobbyId) => {
-  if (!lobbyId) throw new Error('Missing lobbyId.');
+  if (!lobbyId) throw new Error('Missing lobbyId');
 
   let botName = '';
   const joinedAt = Date.now();
@@ -210,16 +210,16 @@ const addBot = async (lobbyId) => {
 
 const startGame = async (lobbyId, variant) => {
   const snapshot = await get(ref(db, `lobby/${lobbyId}`));
-  if (!snapshot.exists()) throw new Error('Game session not found.');
+  if (!snapshot.exists()) throw new Error('Game session not found');
 
   const lobbyData = snapshot.val();
   const playerNames = Object.keys(lobbyData?.players ?? {});
 
-  if (!playerNames.length) throw new Error('No players found in lobby.');
+  if (!playerNames.length) throw new Error('No players found in lobby');
 
   const roundNumber = GAME_ROUNDS[variant];
   if (!roundNumber) {
-    throw new Error('Invalid variant. Please select a valid game variant before starting.');
+    throw new Error('Invalid variant. Please select a valid game variant before starting');
   }
 
   const shuffledPlayerNames = [...playerNames];

@@ -42,7 +42,7 @@ const App = () => {
           setLobbyId('');
           setPlayerName('');
           deleteStorageValue(LOBBY_DETAILS);
-          showToast({ message: 'Game session has ended.', type: 'info' });
+          showToast({ message: 'Game session has ended', type: 'info' });
           return;
         }
 
@@ -57,7 +57,7 @@ const App = () => {
       },
       onError: (dbErr) => {
         console.error('RTDB sync error:', dbErr);
-        showToast({ message: 'Database connection lost.', type: 'error' });
+        showToast({ message: 'Database connection lost', type: 'error' });
       },
     });
 
@@ -92,7 +92,7 @@ const App = () => {
       showToast({ message: `Game created. Code: ${createdGameCode}`, type: 'success' });
     } catch (createErr) {
       console.error('Create error:', createErr);
-      showToast({ message: 'Failed to create game.', type: 'error' });
+      showToast({ message: 'Failed to create game', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -135,10 +135,10 @@ const App = () => {
       });
       setLobbyId(foundLobbyId);
       setView(GAME_STATE.LOBBY);
-      showToast({ message: 'Joined lobby.', type: 'success' });
+      showToast({ message: 'Joined lobby', type: 'success' });
     } catch (joinErr) {
       console.error('Join error:', joinErr);
-      showToast({ message: 'Failed to join game.', type: 'error' });
+      showToast({ message: 'Failed to join game', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -151,14 +151,14 @@ const App = () => {
       await lobbyService.updateVariant(lobbyId, variant);
     } catch (variantErr) {
       console.error('Variant update error:', variantErr);
-      showToast({ message: 'Failed to update variant.', type: 'error' });
+      showToast({ message: 'Failed to update variant', type: 'error' });
     }
   };
 
   const handleStartGame = async (variant) => {
     if (!variant) {
       showToast({
-        message: 'Select a game variant.',
+        message: 'Select a game variant',
         type: 'error',
       });
       return;
@@ -167,7 +167,7 @@ const App = () => {
     const minPlayers = GAME_CONFIG[gameData?.gameType]?.minPlayers;
     if (gameData.players.length < minPlayers) {
       showToast({
-        message: `Need at least ${minPlayers} players to start.`,
+        message: `Need at least ${minPlayers} players to start`,
         type: 'error',
       });
       return;
@@ -181,7 +181,7 @@ const App = () => {
         playerName,
       });
     } catch {
-      showToast({ message: 'Failed to start game.', type: 'error' });
+      showToast({ message: 'Failed to start game', type: 'error' });
     }
   };
 
