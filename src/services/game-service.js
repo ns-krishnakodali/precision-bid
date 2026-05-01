@@ -27,7 +27,7 @@ import {
   TURN_START_MESSAGE,
 } from '../constants';
 import { db } from '../firebase';
-import { dealCards, getSpadesTeamScore } from '../utils';
+import { compareSpadesTeams, dealCards, getSpadesTeamScore } from '../utils';
 
 // Private Methods
 
@@ -74,26 +74,20 @@ const getSpadesTeams = (players = {}, rounds = []) => {
 
   return orderedPlayers.slice(0, halfPlayersCount).map(([playerName, playerDetails], idx) => {
     const [partnerName, partnerDetails] = orderedPlayers[idx + halfPlayersCount];
+    const orderedScores = [playerDetails?.score ?? 0, partnerDetails?.score ?? 0].sort(
+      (score1, score2) => score2 - score1
+    );
 
     return {
-      highestPlayerScore: Math.max(playerDetails?.score ?? 0, partnerDetails?.score ?? 0),
+      highestPlayerScore: orderedScores[0] ?? 0,
       playerNames: [playerName, partnerName],
       score: getSpadesTeamScore({ playerNames: [playerName, partnerName], rounds }),
+      secondHighestPlayerScore: orderedScores[1] ?? 0,
       accumulatedValues: [playerDetails?.accumulated ?? 0, partnerDetails?.accumulated ?? 0].sort(
         (value1, value2) => value1 - value2
       ),
     };
   });
-};
-
-const compareAccumulatedValues = (values1 = [], values2 = []) => {
-  for (let idx = 0; idx < Math.max(values1.length, values2.length); idx++) {
-    const value1 = values1[idx] ?? Number.POSITIVE_INFINITY;
-    const value2 = values2[idx] ?? Number.POSITIVE_INFINITY;
-    if (value1 !== value2) return value1 - value2;
-  }
-
-  return 0;
 };
 
 const getIndividualWinnerNames = (players = {}) => {
@@ -858,39 +852,14 @@ const updateRoundWinnner = async (lobbyId) => {
       if (lobbyData.gameType === GAME_TYPE.SPADES) {
         const teams = getSpadesTeams(lobbyData.players, lobbyData.rounds);
         let winnerTeams = [];
-        let winningHighestPlayerScore = Number.NEGATIVE_INFINITY;
-        let winningScore = Number.NEGATIVE_INFINITY;
-        let winningAccumulatedValues = [];
 
         for (const teamDetails of teams) {
-          const highestPlayerScoreComparison =
-            teamDetails.highestPlayerScore - winningHighestPlayerScore;
-          const scoreComparison = teamDetails.score - winningScore;
-          const accumulatedComparison = compareAccumulatedValues(
-            teamDetails.accumulatedValues,
-            winningAccumulatedValues
-          );
-
-          if (
-            scoreComparison > 0 ||
-            (scoreComparison === 0 && highestPlayerScoreComparison > 0) ||
-            (scoreComparison === 0 &&
-              highestPlayerScoreComparison === 0 &&
-              accumulatedComparison < 0) ||
-            winnerTeams.length === 0
-          ) {
-            winningHighestPlayerScore = teamDetails.highestPlayerScore;
-            winningScore = teamDetails.score;
-            winningAccumulatedValues = teamDetails.accumulatedValues;
+          if (winnerTeams.length === 0 || compareSpadesTeams(teamDetails, winnerTeams[0]) < 0) {
             winnerTeams = [teamDetails];
             continue;
           }
 
-          if (
-            scoreComparison === 0 &&
-            highestPlayerScoreComparison === 0 &&
-            accumulatedComparison === 0
-          ) {
+          if (compareSpadesTeams(teamDetails, winnerTeams[0]) === 0) {
             winnerTeams.push(teamDetails);
           }
         }

@@ -1,7 +1,10 @@
 import {
+  equalTo,
   get,
   onValue,
+  orderByChild,
   push,
+  query,
   ref,
   runTransaction,
   serverTimestamp,
@@ -187,41 +190,6 @@ const removePlayer = async (lobbyId, playerName) => {
   });
 };
 
-const addBot = async (lobbyId) => {
-  if (!lobbyId) throw new Error('Missing lobbyId');
-
-  let botName = '';
-  const joinedAt = Date.now();
-
-  await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
-    if (!lobbyData) return lobbyData;
-    if (lobbyData.status !== LOBBY_STATUS.WAITING) return lobbyData;
-
-    const players = lobbyData.players ?? {};
-    const maxPlayers = GAME_CONFIG[lobbyData.gameType]?.maxPlayers ?? 4;
-    if (Object.keys(players).length >= maxPlayers) return lobbyData;
-
-    let botIdx = 1;
-    while (players[`${BOT_NAME_PREFIX} ${botIdx}`]) botIdx += 1;
-
-    botName = `${BOT_NAME_PREFIX} ${botIdx}`;
-    lobbyData.players = {
-      ...players,
-      [botName]: {
-        isBot: true,
-        isHost: false,
-        joinedAt,
-        name: botName,
-        pin: BOT_PIN,
-      },
-    };
-
-    return lobbyData;
-  });
-
-  return botName;
-};
-
 const startGame = async (lobbyId, variant) => {
   const snapshot = await get(ref(db, `lobby/${lobbyId}`));
   if (!snapshot.exists()) throw new Error('Game session not found');
@@ -276,13 +244,70 @@ const subscribeToLobby = ({ lobbyId, onChange, onError }) => {
   );
 };
 
+const addBot = async (lobbyId) => {
+  if (!lobbyId) throw new Error('Missing lobbyId');
+
+  let botName = '';
+  const joinedAt = Date.now();
+
+  await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
+    if (!lobbyData) return lobbyData;
+    if (lobbyData.status !== LOBBY_STATUS.WAITING) return lobbyData;
+
+    const players = lobbyData.players ?? {};
+    const maxPlayers = GAME_CONFIG[lobbyData.gameType]?.maxPlayers ?? 4;
+    if (Object.keys(players).length >= maxPlayers) return lobbyData;
+
+    let botIdx = 1;
+    while (players[`${BOT_NAME_PREFIX} ${botIdx}`]) botIdx += 1;
+
+    botName = `${BOT_NAME_PREFIX} ${botIdx}`;
+    lobbyData.players = {
+      ...players,
+      [botName]: {
+        isBot: true,
+        isHost: false,
+        joinedAt,
+        name: botName,
+        pin: BOT_PIN,
+      },
+    };
+
+    return lobbyData;
+  });
+
+  return botName;
+};
+
+const deleteCancelledLobbies = async () => {
+  const snapshot = await get(
+    query(ref(db, 'lobby'), orderByChild('status'), equalTo(LOBBY_STATUS.CANCELLED))
+  );
+  if (!snapshot.exists()) return 0;
+
+  const cancelledLobbies = snapshot.val();
+  const updates = {};
+
+  Object.entries(cancelledLobbies).forEach(([lobbyId, lobbyData]) => {
+    updates[`lobby/${lobbyId}`] = null;
+
+    if (lobbyData?.gameCode) {
+      updates[`lobbyCodes/${lobbyData.gameCode}`] = null;
+    }
+  });
+
+  await update(ref(db), updates);
+  return Object.keys(cancelledLobbies).length;
+};
+
 export const lobbyService = {
-  addBot,
   createGameSession,
   getLobbyIdByCode,
   joinGameSession,
+  updateVariant,
   removePlayer,
   startGame,
   subscribeToLobby,
-  updateVariant,
+  addBot,
+  deleteCancelledLobbies,
 };

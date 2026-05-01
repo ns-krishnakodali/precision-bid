@@ -20,7 +20,12 @@ import {
   SUITE_META,
 } from '../../constants';
 import { gameService } from '../../services';
-import { getRoundScore, getSpadesTeamDisplayScore, getSpadesTeamRoundSummary } from '../../utils';
+import {
+  compareSpadesTeams,
+  getRoundScore,
+  getSpadesTeamDisplayScore,
+  getSpadesTeamRoundSummary,
+} from '../../utils';
 
 const getSeatPosition = ({ totalSeats, seatIndex, xRadiusPercent, yRadiusPercent }) => {
   const angle = Math.PI / 2 - (Math.PI * 2 * seatIndex) / totalSeats;
@@ -276,26 +281,27 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
       .slice(0, halfPlayersCount)
       .map((player, idx) => {
         const partner = players[idx + halfPlayersCount];
+        const orderedScores = [player.score ?? 0, partner.score ?? 0].sort(
+          (score1, score2) => score2 - score1
+        );
+
         return {
           teamName: `Team ${idx + 1}`,
           playerNames: [player.name, partner.name],
           players: [player, partner],
+          highestPlayerScore: orderedScores[0] ?? 0,
           score: getSpadesTeamDisplayScore({
             playerNames: [player.name, partner.name],
             rounds: gameData.rounds,
             gameCompleted: gameData.roundStatus === GAME_OVER_STATUS,
           }),
+          secondHighestPlayerScore: orderedScores[1] ?? 0,
           accumulatedValues: [player.accumulated ?? 0, partner.accumulated ?? 0].sort(
             (value1, value2) => value1 - value2
           ),
         };
       })
-      .sort(
-        (team1, team2) =>
-          team2.score - team1.score ||
-          team1.accumulatedValues[0] - team2.accumulatedValues[0] ||
-          team1.accumulatedValues[1] - team2.accumulatedValues[1]
-      );
+      .sort(compareSpadesTeams);
   }, [gameData.roundStatus, gameData.rounds, isSpadesGame, players]);
 
   const scoreHistoryTeam = useMemo(

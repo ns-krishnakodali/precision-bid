@@ -42,3 +42,28 @@ export const getSpadesTeamDisplayScore = ({
     playerNames,
     rounds: gameCompleted ? rounds : rounds.slice(0, -1),
   });
+
+export const compareSpadesTeams = (team1 = {}, team2 = {}) => {
+  const scoreComparison = (team2.score ?? 0) - (team1.score ?? 0);
+  if (scoreComparison) return scoreComparison;
+
+  const highestPlayerScoreComparison =
+    (team2.highestPlayerScore ?? 0) - (team1.highestPlayerScore ?? 0);
+  if (highestPlayerScoreComparison) return highestPlayerScoreComparison;
+
+  const secondHighestPlayerScoreComparison =
+    (team2.secondHighestPlayerScore ?? 0) - (team1.secondHighestPlayerScore ?? 0);
+  if (secondHighestPlayerScoreComparison) return secondHighestPlayerScoreComparison;
+
+  for (
+    let idx = 0;
+    idx < Math.max(team1.accumulatedValues?.length ?? 0, team2.accumulatedValues?.length ?? 0);
+    idx++
+  ) {
+    const value1 = team1.accumulatedValues?.[idx] ?? Number.POSITIVE_INFINITY;
+    const value2 = team2.accumulatedValues?.[idx] ?? Number.POSITIVE_INFINITY;
+    if (value1 !== value2) return value1 - value2;
+  }
+
+  return 0;
+};

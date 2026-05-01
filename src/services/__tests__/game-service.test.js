@@ -1215,7 +1215,7 @@ describe('gameService', () => {
       expect(transaction.states[0].roundStatus).toBe(GAME_OVER_STATUS);
       expect(transaction.states[0].statusText).toBe(FINALIZING_RESULTS_MESSAGE);
       expect(data.roundStatus).toBe(GAME_OVER_STATUS);
-      expect(data.winnerNames).toEqual(['Player1', 'Player3', 'Player2', 'Player4']);
+      expect(data.winnerNames).toEqual(['Player2', 'Player4']);
       expect(data.rounds.at(-1).players.Player1.wins).toBe(1);
     });
 
@@ -1572,7 +1572,38 @@ describe('gameService', () => {
       expect(transaction.getData().winnerNames).toEqual(['Player1', 'Player3']);
     });
 
-    it('uses lower accumulated values after the highest individual final score also ties', async () => {
+    it('uses the second player final score after the highest individual final score also ties', async () => {
+      const transaction = useTransactionData(
+        createLobby({
+          players: {
+            Player1: { accumulated: 2, cards: [], orderIdx: 0, score: 70 },
+            Player2: { accumulated: 0, cards: [], orderIdx: 1, score: 70 },
+            Player3: { accumulated: 0, cards: [], orderIdx: 2, score: 40 },
+            Player4: { accumulated: 0, cards: [], orderIdx: 3, score: 50 },
+          },
+          roundNumber: MAX_ROUNDS,
+          rounds: [
+            {
+              currentTurn: 1,
+              players: createRoundPlayers({
+                Player1: { bids: 1, wins: 1 },
+                Player2: { bids: 1, wins: 1 },
+                Player3: { bids: 1, wins: 1 },
+                Player4: { bids: 1, wins: 1 },
+              }),
+              startPlayerIdx: 0,
+              trumpSuit: SPADE,
+            },
+          ],
+        })
+      );
+
+      await gameService.updateRoundWinnner('lobby-1');
+
+      expect(transaction.getData().winnerNames).toEqual(['Player2', 'Player4']);
+    });
+
+    it('uses lower accumulated values after both player scores also tie', async () => {
       const transaction = useTransactionData(
         createLobby({
           players: {
@@ -1603,7 +1634,7 @@ describe('gameService', () => {
       expect(transaction.getData().winnerNames).toEqual(['Player1', 'Player3']);
     });
 
-    it('declares both Spades teams winners when team score, highest player score, and accumulated values tie', async () => {
+    it('declares both Spades teams winners when both player scores and accumulated values tie', async () => {
       const transaction = useTransactionData(
         createLobby({
           players: {
@@ -1637,31 +1668,6 @@ describe('gameService', () => {
         'Player2',
         'Player4',
       ]);
-    });
-
-    it('falls back to individual winners when Spades teams cannot be formed from the player list', async () => {
-      const transaction = useTransactionData(
-        createLobby({
-          players: {
-            Player1: { accumulated: 1, cards: [], orderIdx: 0, score: 80 },
-            Player2: { accumulated: 0, cards: [], orderIdx: 1, score: 70 },
-            Player3: { accumulated: 0, cards: [], orderIdx: 2, score: 80 },
-          },
-          roundNumber: MAX_ROUNDS,
-          rounds: [
-            {
-              currentTurn: 1,
-              players: createRoundPlayersByCount(3),
-              startPlayerIdx: 0,
-              trumpSuit: SPADE,
-            },
-          ],
-        })
-      );
-
-      await gameService.updateRoundWinnner('lobby-1');
-
-      expect(transaction.getData().winnerNames).toEqual(['Player3']);
     });
 
     it('adds a new round after scoring when the game is not over', async () => {
