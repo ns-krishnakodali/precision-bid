@@ -32,3 +32,13 @@ export const getSpadesTeamScore = ({ playerNames = [], rounds = [] }) =>
       teamScore + getSpadesTeamRoundScore({ playerNames, roundPlayers: round?.players }),
     0
   );
+
+export const getSpadesTeamDisplayScore = ({
+  playerNames = [],
+  rounds = [],
+  gameCompleted = false,
+}) =>
+  getSpadesTeamScore({
+    playerNames,
+    rounds: gameCompleted ? rounds : rounds.slice(0, -1),
+  });

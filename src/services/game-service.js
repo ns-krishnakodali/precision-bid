@@ -78,6 +78,7 @@ const getSpadesTeams = (players = {}, rounds = []) => {
     const [partnerName, partnerDetails] = orderedPlayers[idx + halfPlayersCount];
 
     return {
+      highestPlayerScore: Math.max(playerDetails?.score ?? 0, partnerDetails?.score ?? 0),
       playerNames: [playerName, partnerName],
       score: getSpadesTeamScore({ playerNames: [playerName, partnerName], rounds }),
       accumulatedValues: [playerDetails?.accumulated ?? 0, partnerDetails?.accumulated ?? 0].sort(
@@ -139,6 +140,9 @@ const getPlayerNameByOrderIdx = (players = {}, orderIdx = 0) =>
 
 const getCurrentPlayerName = (lobbyData) =>
   getPlayerNameByOrderIdx(lobbyData?.players, lobbyData?.currentPlayerIdx);
+
+const BOT_RECOVERABLE_ROUND_STATUSES = [NEW_TURN_STATUS, NEW_ROUND_STATUS, GAME_OVER_STATUS];
+const TURN_RESOLUTION_DELAY = 1200;
 
 const isLastActionInCycle = (lobbyData, currentRound) => {
   const playersCount = getOrderedPlayerNames(lobbyData?.players).length;
@@ -581,10 +585,12 @@ const processBotAction = async (lobbyId, hostPlayerName) => {
 
   let actionTaken = false;
   let resolveTurnWinner = false;
+  let resumeTurnResolution = false;
 
   const transactionResult = await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
     actionTaken = false;
     resolveTurnWinner = false;
+    resumeTurnResolution = false;
 
     if (!lobbyData || lobbyData.host !== hostPlayerName) return lobbyData;
 
@@ -593,6 +599,11 @@ const processBotAction = async (lobbyId, hostPlayerName) => {
     const playerDetails = lobbyData.players?.[playerName];
     const roundPlayer = currentRound?.players?.[playerName];
     if (!currentRound || !playerDetails?.isBot || !roundPlayer) return lobbyData;
+
+    if (BOT_RECOVERABLE_ROUND_STATUSES.includes(lobbyData.roundStatus)) {
+      resumeTurnResolution = true;
+      return lobbyData;
+    }
 
     const botActionKey = [
       lobbyData.roundNumber,
@@ -675,6 +686,11 @@ const processBotAction = async (lobbyId, hostPlayerName) => {
     return lobbyData;
   });
 
+  if (resumeTurnResolution) {
+    await updateTurnWinner(lobbyId);
+    return true;
+  }
+
   if (actionTaken && transactionResult?.committed !== false && resolveTurnWinner) {
     await updateTurnWinner(lobbyId);
   }
@@ -685,15 +701,32 @@ const processBotAction = async (lobbyId, hostPlayerName) => {
 const updateTurnWinner = async (lobbyId) => {
   if (!lobbyId) throw new Error('Missing lobbyId.');
 
+  let pendingTurn = 0;
+  let pendingTurnStartedAt = 0;
   let roundNumber = null;
+  let resolvedTurn = false;
   let startNewRound = false;
 
   await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
     if (!lobbyData) return lobbyData;
 
+    const currentRound = lobbyData.rounds.at(-1);
+    if (!currentRound) return lobbyData;
+
     const maxRounds = getMaxRounds(lobbyData);
     roundNumber = lobbyData?.roundNumber;
-    startNewRound = lobbyData.rounds.at(-1)?.currentTurn === roundNumber;
+    pendingTurn = Number(currentRound.pendingTurnWinnerTurn ?? currentRound.currentTurn ?? 0);
+    if (pendingTurn <= 0) return lobbyData;
+
+    if (Number(currentRound.pendingTurnWinnerTurn ?? 0) !== pendingTurn) {
+      currentRound.pendingTurnWinnerTurn = pendingTurn;
+      currentRound.pendingTurnWinnerAt = Date.now();
+    } else if (typeof currentRound.pendingTurnWinnerAt === 'undefined') {
+      currentRound.pendingTurnWinnerAt = Date.now();
+    }
+
+    pendingTurnStartedAt = Number(currentRound.pendingTurnWinnerAt ?? Date.now());
+    startNewRound = pendingTurn === roundNumber;
 
     if (startNewRound) {
       if (roundNumber < maxRounds) {
@@ -711,13 +744,19 @@ const updateTurnWinner = async (lobbyId) => {
     return lobbyData;
   });
 
-  await new Promise((resolve) => setTimeout(resolve, 1200));
+  await new Promise((resolve) =>
+    setTimeout(resolve, Math.max(0, TURN_RESOLUTION_DELAY - (Date.now() - pendingTurnStartedAt)))
+  );
 
   await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
     if (!lobbyData) return lobbyData;
 
     const currentRound = lobbyData.rounds.at(-1);
-    const currentTurn = currentRound.currentTurn - 1;
+    if (!currentRound || Number(currentRound.pendingTurnWinnerTurn ?? 0) !== pendingTurn) {
+      return lobbyData;
+    }
+
+    const currentTurn = pendingTurn - 1;
 
     const startPlayerName = Object.entries(lobbyData.players ?? {}).find(
       ([, playerDetails]) => Number(playerDetails.orderIdx) === currentRound.startPlayerIdx
@@ -770,14 +809,17 @@ const updateTurnWinner = async (lobbyId) => {
 
     if (!startNewRound) {
       lobbyData.roundStatus = GAME_STATUS;
-      currentRound.currentTurn += 1;
+      currentRound.currentTurn = pendingTurn + 1;
     }
+    delete currentRound.pendingTurnWinnerTurn;
+    delete currentRound.pendingTurnWinnerAt;
     lobbyData.statusText = '';
+    resolvedTurn = true;
 
     return lobbyData;
   });
 
-  if (startNewRound) {
+  if (resolvedTurn && startNewRound) {
     await updateRoundWinnner(lobbyId);
   }
 };
@@ -821,10 +863,13 @@ const updateRoundWinnner = async (lobbyId) => {
       if (lobbyData.gameType === GAME_TYPE.SPADES) {
         const teams = getSpadesTeams(lobbyData.players, lobbyData.rounds);
         let winnerTeams = [];
+        let winningHighestPlayerScore = Number.NEGATIVE_INFINITY;
         let winningScore = Number.NEGATIVE_INFINITY;
         let winningAccumulatedValues = [];
 
         for (const teamDetails of teams) {
+          const highestPlayerScoreComparison =
+            teamDetails.highestPlayerScore - winningHighestPlayerScore;
           const scoreComparison = teamDetails.score - winningScore;
           const accumulatedComparison = compareAccumulatedValues(
             teamDetails.accumulatedValues,
@@ -833,16 +878,24 @@ const updateRoundWinnner = async (lobbyId) => {
 
           if (
             scoreComparison > 0 ||
-            (scoreComparison === 0 && accumulatedComparison < 0) ||
+            (scoreComparison === 0 && highestPlayerScoreComparison > 0) ||
+            (scoreComparison === 0 &&
+              highestPlayerScoreComparison === 0 &&
+              accumulatedComparison < 0) ||
             winnerTeams.length === 0
           ) {
+            winningHighestPlayerScore = teamDetails.highestPlayerScore;
             winningScore = teamDetails.score;
             winningAccumulatedValues = teamDetails.accumulatedValues;
             winnerTeams = [teamDetails];
             continue;
           }
 
-          if (scoreComparison === 0 && accumulatedComparison === 0) {
+          if (
+            scoreComparison === 0 &&
+            highestPlayerScoreComparison === 0 &&
+            accumulatedComparison === 0
+          ) {
             winnerTeams.push(teamDetails);
           }
         }

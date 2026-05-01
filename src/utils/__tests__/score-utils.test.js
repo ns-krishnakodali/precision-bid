@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { getRoundScore, getSpadesTeamRoundScore, getSpadesTeamRoundSummary } from '../score-utils';
+import {
+  getRoundScore,
+  getSpadesTeamDisplayScore,
+  getSpadesTeamRoundScore,
+  getSpadesTeamRoundSummary,
+} from '../score-utils';
 
 describe('scoreUtils', () => {
   describe('getRoundScore', () => {
@@ -73,6 +78,42 @@ describe('scoreUtils', () => {
           },
         })
       ).toBe(-30);
+    });
+  });
+
+  describe('getSpadesTeamDisplayScore', () => {
+    const rounds = [
+      {
+        players: {
+          Player1: { bids: 1, wins: 1 },
+          Player2: { bids: 1, wins: 1 },
+        },
+      },
+      {
+        players: {
+          Player1: { bids: 1, wins: 1 },
+          Player2: { bids: 1, wins: 1 },
+        },
+      },
+    ];
+
+    it('excludes the current round until the game is completed', () => {
+      expect(
+        getSpadesTeamDisplayScore({
+          playerNames: ['Player1', 'Player2'],
+          rounds,
+        })
+      ).toBe(20);
+    });
+
+    it('includes the last round after the game is completed', () => {
+      expect(
+        getSpadesTeamDisplayScore({
+          playerNames: ['Player1', 'Player2'],
+          rounds,
+          gameCompleted: true,
+        })
+      ).toBe(40);
     });
   });
 });

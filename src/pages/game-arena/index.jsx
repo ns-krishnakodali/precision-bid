@@ -10,6 +10,7 @@ import {
   CARD_SUITS,
   CLUB,
   DIAMOND,
+  GAME_OVER_STATUS,
   GAME_TYPE,
   HEART,
   JOKER,
@@ -19,7 +20,7 @@ import {
   SUITE_META,
 } from '../../constants';
 import { gameService } from '../../services';
-import { getRoundScore, getSpadesTeamRoundSummary, getSpadesTeamScore } from '../../utils';
+import { getRoundScore, getSpadesTeamDisplayScore, getSpadesTeamRoundSummary } from '../../utils';
 
 const getSeatPosition = ({ totalSeats, seatIndex, xRadiusPercent, yRadiusPercent }) => {
   const angle = Math.PI / 2 - (Math.PI * 2 * seatIndex) / totalSeats;
@@ -289,9 +290,10 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
           teamName: `Team ${idx + 1}`,
           playerNames: [player.name, partner.name],
           players: [player, partner],
-          score: getSpadesTeamScore({
+          score: getSpadesTeamDisplayScore({
             playerNames: [player.name, partner.name],
             rounds: gameData.rounds,
+            gameCompleted: gameData.roundStatus === GAME_OVER_STATUS,
           }),
           accumulatedValues: [player.accumulated ?? 0, partner.accumulated ?? 0].sort(
             (value1, value2) => value1 - value2
@@ -304,7 +306,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
           team1.accumulatedValues[0] - team2.accumulatedValues[0] ||
           team1.accumulatedValues[1] - team2.accumulatedValues[1]
       );
-  }, [gameData.rounds, isSpadesGame, players]);
+  }, [gameData.roundStatus, gameData.rounds, isSpadesGame, players]);
 
   const scoreHistoryTeam = useMemo(
     () => spadesTeams.find((team) => team.teamName === scoreHistoryTeamName),
@@ -1018,8 +1020,10 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                                 }),
                                 wins: round?.players?.[scoreHistoryPlayerName]?.wins ?? 0,
                               };
-                          const isCurrentRound = roundIdx === (gameData.rounds?.length ?? 1) - 1;
-                          const score = !isCurrentRound ? roundSummary.score : 0;
+                          const isCurrentRound =
+                            gameData.roundStatus !== GAME_OVER_STATUS &&
+                            roundIdx === (gameData.rounds?.length ?? 0) - 1;
+                          const score = isCurrentRound ? 0 : roundSummary.score;
 
                           return (
                             <div
@@ -1048,7 +1052,19 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                                 {roundSummary.wins}
                               </p>
                               <p className="text-center text-sm font-black tabular-nums sm:text-base">
-                                {roundSummary.accumulatedPenalty > 0 ? (
+                                {scoreHistoryTeam && gameData.gameType === GAME_TYPE.SPADES ? (
+                                  <span
+                                    className={
+                                      roundSummary.accumulatedPenalty > 0
+                                        ? 'text-rose-300/80'
+                                        : 'text-slate-100'
+                                    }
+                                  >
+                                    {roundSummary.accumulatedPenalty > 0
+                                      ? `-${roundSummary.accumulatedPenalty}`
+                                      : 0}
+                                  </span>
+                                ) : roundSummary.accumulatedPenalty > 0 ? (
                                   <span className="text-rose-300/80">
                                     -{roundSummary.accumulatedPenalty}
                                   </span>
@@ -1260,7 +1276,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                 <div className="flex items-start justify-center gap-4 text-center">
                   <div className="min-w-0">
                     <h3 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
-                      Choose a Trump Suit
+                      Choose Trump Suit
                     </h3>
                     <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
                       <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-cyan-200">
@@ -1454,7 +1470,12 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                       <span className="text-sm font-black text-white tabular-nums">
                         {isSpadesGame
                           ? winningTeams
-                              .map((team) => team.accumulatedValues.join(' / '))
+                              .map((team) =>
+                                team.accumulatedValues.reduce(
+                                  (sum, value) => sum + Number(value ?? 0),
+                                  0
+                                )
+                              )
                               .join(' | ')
                           : winningPlayers[0]?.accumulated}
                       </span>
