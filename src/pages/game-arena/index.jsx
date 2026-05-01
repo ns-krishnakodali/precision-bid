@@ -11,9 +11,9 @@ import {
   CLUB,
   DIAMOND,
   GAME_OVER_STATUS,
+  GAME_STATUS,
   GAME_TYPE,
   HEART,
-  JOKER,
   SELECT_TRUMP_STATUS,
   SPADE,
   SPADES_VARIANT,
@@ -27,16 +27,6 @@ const getSeatPosition = ({ totalSeats, seatIndex, xRadiusPercent, yRadiusPercent
   const x = 50 + xRadiusPercent * Math.cos(angle);
   const y = 50 - yRadiusPercent * Math.sin(angle);
   return { angle, x, y };
-};
-
-const getEffectiveSuit = (card, currentRound) => {
-  const suit = card?.suit ?? card?.type ?? '';
-
-  if (suit === JOKER && currentRound?.trumpSuit) {
-    return currentRound.trumpSuit;
-  }
-
-  return suit;
 };
 
 const ActionButton = ({ children, onClick, variant = 'secondary', className = '' }) => {
@@ -333,10 +323,14 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
         ]
       : null;
   const leadSuit =
-    Number(currentRound?.currentTurn ?? 0) - 1 >= 0 ? getEffectiveSuit(leadCard, currentRound) : '';
+    Number(currentRound?.currentTurn ?? 0) - 1 >= 0
+      ? gameService.getEffectiveSuit(leadCard, currentRound)
+      : '';
   const restrictedSuit =
     leadSuit &&
-    playerHand.some((cardDetails) => getEffectiveSuit(cardDetails, currentRound) === leadSuit)
+    playerHand.some(
+      (cardDetails) => gameService.getEffectiveSuit(cardDetails, currentRound) === leadSuit
+    )
       ? leadSuit
       : '';
   const isBidValid =
@@ -571,6 +565,11 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                 </div>
               </div>
               {isSpadesGame && (
+                <div className="pointer-events-none absolute inset-0 z-5 sm:hidden">
+                  <div className="absolute top-[28%] bottom-[8%] left-1/2 -translate-x-1/2 border-l border-dotted border-white/18" />
+                </div>
+              )}
+              {isSpadesGame && (
                 <div className="pointer-events-none absolute inset-0 z-5 hidden sm:block">
                   <div className="absolute left-[14%] right-[14%] top-1/2 -translate-y-1/2 border-t border-dashed border-white/14" />
                   <div className="absolute top-[14%] bottom-[14%] left-1/2 -translate-x-1/2 border-l border-dashed border-white/14" />
@@ -674,10 +673,11 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                         key={idx}
                         type="button"
                         disabled={
-                          gameData.roundStatus === BIDDING ||
+                          gameData.roundStatus !== GAME_STATUS ||
                           !isPlayerTurn ||
                           (restrictedSuit !== '' &&
-                            getEffectiveSuit(cardDetails, currentRound) !== restrictedSuit)
+                            gameService.getEffectiveSuit(cardDetails, currentRound) !==
+                              restrictedSuit)
                         }
                         className="rounded-xl motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-300 transition-all
                           duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2
@@ -1103,14 +1103,15 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
         <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 sm:p-6 overflow-y-auto">
           <div className="absolute inset-0 bg-[#020617]/80 backdrop-blur-lg" />
           <div
-            className="w-full max-w-5xl relative z-10 bg-slate-900/40 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] shadow-[0_30px_120px_rgba(0,0,0,0.65)]
-              overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3rem)]"
+            className="relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col overflow-y-auto rounded-4xl border border-white/5 bg-slate-900/40
+              pb-2 sm:pb-3 shadow-[0_30px_120px_rgba(0,0,0,0.65)] backdrop-blur-3xl animate-in fade-in zoom-in-95 duration-200 sm:max-h-[calc(100dvh-3rem)]
+              sm:overflow-hidden sm:rounded-[2.5rem]"
             role="dialog"
             aria-modal="true"
             aria-label="Place your bid"
           >
             <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.14)_0%,transparent_55%)]" />
-            <div className="relative z-10 px-6 py-5 flex flex-col h-full min-h-0">
+            <div className="relative z-10 flex flex-col px-4 py-5 sm:h-full sm:min-h-0 sm:px-6">
               <div className="flex items-center justify-between px-3">
                 <div className="min-w-0">
                   <h3 className="text-2xl sm:text-3xl font-black tracking-tight mt-1 truncate">
@@ -1118,7 +1119,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                   </h3>
                 </div>
               </div>
-              <div className="mt-7 grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8 flex-1 min-h-0">
+              <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-5 lg:gap-8 sm:flex-1 sm:min-h-0">
                 <div className="lg:col-span-2">
                   <div className="mb-4 rounded-4xl border border-white/5 bg-slate-950/35 p-4 shadow-[0_20px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
                     <div className="flex items-center justify-between gap-4">
@@ -1200,7 +1201,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                     </span>
                   </div>
                 </div>
-                <div className="lg:col-span-3 flex flex-col min-h-0">
+                <div className="flex flex-col lg:col-span-3 sm:min-h-0">
                   <div className="flex items-end justify-between gap-3">
                     <div>
                       <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.35em]">
@@ -1219,8 +1220,11 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                       </span>
                     </div>
                   </div>
-                  <div className="mt-4 flex-1 min-h-0 rounded-4xl bg-slate-950/35 border border-white/5 backdrop-blur-xl shadow-[0_20px_70px_rgba(0,0,0,0.45)] overflow-hidden">
-                    <div className="p-4 sm:p-6 h-full min-h-0 overflow-y-auto">
+                  <div
+                    className="mt-4 rounded-4xl border border-white/5 bg-slate-950/35 shadow-[0_20px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:flex-1 sm:min-h-0
+                      sm:overflow-hidden"
+                  >
+                    <div className="p-4 sm:h-full sm:min-h-0 sm:overflow-y-auto sm:p-6">
                       {playerHand.length === 0 ? (
                         <div className="h-full min-h-40 flex items-center justify-center">
                           <p className="text-sm text-slate-400 font-black uppercase tracking-[0.3em]">
@@ -1507,7 +1511,6 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
                   <BarChart3 size={18} className="text-cyan-300" />
                   View Stats
                 </ActionButton>
-
                 <ActionButton variant="danger" className="h-12 w-full sm:w-52" onClick={onLeave}>
                   <LogOut size={18} />
                   Leave Game

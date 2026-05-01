@@ -23,6 +23,7 @@ import {
   SELECT_TRUMP_STATUS,
   SMALL_JOKER,
   SPADE,
+  TURN_RESOLUTION_DELAY,
   TURN_START_MESSAGE,
 } from '../constants';
 import { db } from '../firebase';
@@ -62,9 +63,6 @@ const getBidWinner = (currentRound, lobbyPlayers) => {
 };
 
 const getCardSuit = (card) => card?.suit ?? card?.type ?? '';
-
-const getEffectiveSuit = (card, currentRound) =>
-  getCardSuit(card) === JOKER ? currentRound.trumpSuit : getCardSuit(card);
 
 const getSpadesTeams = (players = {}, rounds = []) => {
   const orderedPlayers = Object.entries(players).sort(
@@ -140,9 +138,6 @@ const getPlayerNameByOrderIdx = (players = {}, orderIdx = 0) =>
 
 const getCurrentPlayerName = (lobbyData) =>
   getPlayerNameByOrderIdx(lobbyData?.players, lobbyData?.currentPlayerIdx);
-
-const BOT_RECOVERABLE_ROUND_STATUSES = [NEW_TURN_STATUS, NEW_ROUND_STATUS, GAME_OVER_STATUS];
-const TURN_RESOLUTION_DELAY = 1200;
 
 const isLastActionInCycle = (lobbyData, currentRound) => {
   const playersCount = getOrderedPlayerNames(lobbyData?.players).length;
@@ -464,6 +459,11 @@ const chooseBotCard = (lobbyData, playerName) => {
 
 // Public Methods
 
+const getEffectiveSuit = (card, currentRound) =>
+  getCardSuit(card) === JOKER && currentRound?.trumpSuit
+    ? currentRound.trumpSuit
+    : getCardSuit(card);
+
 const addNewRound = async (lobbyId) => {
   if (!lobbyId) throw new Error('Missing lobbyId.');
 
@@ -585,12 +585,10 @@ const processBotAction = async (lobbyId, hostPlayerName) => {
 
   let actionTaken = false;
   let resolveTurnWinner = false;
-  let resumeTurnResolution = false;
 
   const transactionResult = await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
     actionTaken = false;
     resolveTurnWinner = false;
-    resumeTurnResolution = false;
 
     if (!lobbyData || lobbyData.host !== hostPlayerName) return lobbyData;
 
@@ -599,11 +597,6 @@ const processBotAction = async (lobbyId, hostPlayerName) => {
     const playerDetails = lobbyData.players?.[playerName];
     const roundPlayer = currentRound?.players?.[playerName];
     if (!currentRound || !playerDetails?.isBot || !roundPlayer) return lobbyData;
-
-    if (BOT_RECOVERABLE_ROUND_STATUSES.includes(lobbyData.roundStatus)) {
-      resumeTurnResolution = true;
-      return lobbyData;
-    }
 
     const botActionKey = [
       lobbyData.roundNumber,
@@ -686,11 +679,6 @@ const processBotAction = async (lobbyId, hostPlayerName) => {
     return lobbyData;
   });
 
-  if (resumeTurnResolution) {
-    await updateTurnWinner(lobbyId);
-    return true;
-  }
-
   if (actionTaken && transactionResult?.committed !== false && resolveTurnWinner) {
     await updateTurnWinner(lobbyId);
   }
@@ -701,13 +689,16 @@ const processBotAction = async (lobbyId, hostPlayerName) => {
 const updateTurnWinner = async (lobbyId) => {
   if (!lobbyId) throw new Error('Missing lobbyId.');
 
-  let pendingTurn = 0;
-  let pendingTurnStartedAt = 0;
   let roundNumber = null;
   let resolvedTurn = false;
+  let resolvingTurn = 0;
+  let shouldResolveTurn = false;
   let startNewRound = false;
 
   await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
+    resolvedTurn = false;
+    shouldResolveTurn = false;
+
     if (!lobbyData) return lobbyData;
 
     const currentRound = lobbyData.rounds.at(-1);
@@ -715,18 +706,18 @@ const updateTurnWinner = async (lobbyId) => {
 
     const maxRounds = getMaxRounds(lobbyData);
     roundNumber = lobbyData?.roundNumber;
-    pendingTurn = Number(currentRound.pendingTurnWinnerTurn ?? currentRound.currentTurn ?? 0);
-    if (pendingTurn <= 0) return lobbyData;
-
-    if (Number(currentRound.pendingTurnWinnerTurn ?? 0) !== pendingTurn) {
-      currentRound.pendingTurnWinnerTurn = pendingTurn;
-      currentRound.pendingTurnWinnerAt = Date.now();
-    } else if (typeof currentRound.pendingTurnWinnerAt === 'undefined') {
-      currentRound.pendingTurnWinnerAt = Date.now();
+    resolvingTurn = Number(currentRound.currentTurn ?? 0);
+    if (
+      resolvingTurn <= 0 ||
+      Object.values(currentRound.players ?? {}).some(
+        (playerDetails) => !playerDetails.played?.[resolvingTurn - 1]
+      )
+    ) {
+      return lobbyData;
     }
 
-    pendingTurnStartedAt = Number(currentRound.pendingTurnWinnerAt ?? Date.now());
-    startNewRound = pendingTurn === roundNumber;
+    shouldResolveTurn = true;
+    startNewRound = resolvingTurn === roundNumber;
 
     if (startNewRound) {
       if (roundNumber < maxRounds) {
@@ -744,19 +735,25 @@ const updateTurnWinner = async (lobbyId) => {
     return lobbyData;
   });
 
-  await new Promise((resolve) =>
-    setTimeout(resolve, Math.max(0, TURN_RESOLUTION_DELAY - (Date.now() - pendingTurnStartedAt)))
-  );
+  if (!shouldResolveTurn) return;
+
+  await new Promise((resolve) => setTimeout(resolve, TURN_RESOLUTION_DELAY));
 
   await runTransaction(ref(db, `lobby/${lobbyId}`), (lobbyData) => {
     if (!lobbyData) return lobbyData;
 
     const currentRound = lobbyData.rounds.at(-1);
-    if (!currentRound || Number(currentRound.pendingTurnWinnerTurn ?? 0) !== pendingTurn) {
+    if (
+      !currentRound ||
+      Number(currentRound.currentTurn ?? 0) !== resolvingTurn ||
+      Object.values(currentRound.players ?? {}).some(
+        (playerDetails) => !playerDetails.played?.[resolvingTurn - 1]
+      )
+    ) {
       return lobbyData;
     }
 
-    const currentTurn = pendingTurn - 1;
+    const currentTurn = resolvingTurn - 1;
 
     const startPlayerName = Object.entries(lobbyData.players ?? {}).find(
       ([, playerDetails]) => Number(playerDetails.orderIdx) === currentRound.startPlayerIdx
@@ -809,10 +806,8 @@ const updateTurnWinner = async (lobbyId) => {
 
     if (!startNewRound) {
       lobbyData.roundStatus = GAME_STATUS;
-      currentRound.currentTurn = pendingTurn + 1;
+      currentRound.currentTurn = resolvingTurn + 1;
     }
-    delete currentRound.pendingTurnWinnerTurn;
-    delete currentRound.pendingTurnWinnerAt;
     lobbyData.statusText = '';
     resolvedTurn = true;
 
@@ -918,6 +913,7 @@ const updateRoundWinnner = async (lobbyId) => {
 };
 
 export const gameService = {
+  getEffectiveSuit,
   addNewRound,
   processBotAction,
   updateRoundState,

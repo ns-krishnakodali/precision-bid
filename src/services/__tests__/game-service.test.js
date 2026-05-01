@@ -148,6 +148,14 @@ describe('gameService', () => {
     vi.useRealTimers();
   });
 
+  describe('getEffectiveSuit', () => {
+    it('maps jokers to trump and leaves other suits unchanged', () => {
+      expect(gameService.getEffectiveSuit(card('SJ', JOKER), { trumpSuit: HEART })).toBe(HEART);
+      expect(gameService.getEffectiveSuit(card('A', SPADE), { trumpSuit: HEART })).toBe(SPADE);
+      expect(gameService.getEffectiveSuit(card('SJ', JOKER), {})).toBe(JOKER);
+    });
+  });
+
   describe('addNewRound', () => {
     it('adds a BIDDING round, deals cards, and positions the starting player', async () => {
       const transaction = useTransactionData(
@@ -775,17 +783,16 @@ describe('gameService', () => {
       expect(data.roundStatus).toBe(GAME_STATUS);
     });
 
-    it('resumes a stuck bot turn while the lobby is waiting on post-trick resolution', async () => {
-      vi.useFakeTimers();
+    it('does not process bot actions during post-trick transitions', async () => {
       const players = createPlayers();
-      const transaction = useTransactionData(
+
+      const newTurnTransaction = useTransactionData(
         createLobby({
           currentPlayerIdx: 3,
           players: {
             ...players,
             Player4: {
               ...players.Player4,
-              cards: [card('7', HEART)],
               isBot: true,
             },
           },
@@ -794,7 +801,6 @@ describe('gameService', () => {
           rounds: [
             {
               currentTurn: 1,
-              lastBotActionKey: `3:1:${GAME_STATUS}:3:Player4`,
               players: createRoundPlayers({
                 Player1: { played: [card('A', HEART)], wins: 0 },
                 Player2: { played: [card('K', HEART)], wins: 0 },
@@ -807,43 +813,29 @@ describe('gameService', () => {
           ],
         })
       );
+      await expect(gameService.processBotAction('lobby-1', 'Player1')).resolves.toBe(false);
+      expect(newTurnTransaction.getData().roundStatus).toBe(NEW_TURN_STATUS);
 
-      const processPromise = gameService.processBotAction('lobby-1', 'Player1');
-      await vi.advanceTimersByTimeAsync(1200);
-      await expect(processPromise).resolves.toBe(true);
-
-      const data = transaction.getData();
-      expect(data.rounds.at(-1).players.Player1.wins).toBe(1);
-      expect(data.rounds.at(-1).currentTurn).toBe(2);
-      expect(data.currentPlayerIdx).toBe(0);
-      expect(data.roundStatus).toBe(GAME_STATUS);
-    });
-
-    it('does not resolve a stuck bot turn twice when retries overlap', async () => {
-      vi.useFakeTimers();
-      const players = createPlayers();
-      const transaction = useTransactionData(
+      const newRoundTransaction = useTransactionData(
         createLobby({
           currentPlayerIdx: 3,
           players: {
             ...players,
             Player4: {
               ...players.Player4,
-              cards: [card('7', HEART)],
               isBot: true,
             },
           },
           roundNumber: 3,
-          roundStatus: NEW_TURN_STATUS,
+          roundStatus: NEW_ROUND_STATUS,
           rounds: [
             {
-              currentTurn: 1,
-              lastBotActionKey: `3:1:${GAME_STATUS}:3:Player4`,
+              currentTurn: 3,
               players: createRoundPlayers({
-                Player1: { played: [card('A', HEART)], wins: 0 },
-                Player2: { played: [card('K', HEART)], wins: 0 },
-                Player3: { played: [card('Q', HEART)], wins: 0 },
-                Player4: { bids: 0, played: [card('7', HEART)], wins: 0 },
+                Player1: { played: playedOnTurn(3, card('A', HEART)), wins: 0 },
+                Player2: { played: playedOnTurn(3, card('K', HEART)), wins: 0 },
+                Player3: { played: playedOnTurn(3, card('Q', HEART)), wins: 0 },
+                Player4: { bids: 0, played: playedOnTurn(3, card('7', HEART)), wins: 0 },
               }),
               startPlayerIdx: 0,
               trumpSuit: SPADE,
@@ -852,17 +844,41 @@ describe('gameService', () => {
         })
       );
 
-      const firstRetryPromise = gameService.processBotAction('lobby-1', 'Player1');
-      const secondRetryPromise = gameService.processBotAction('lobby-1', 'Player1');
-      await vi.advanceTimersByTimeAsync(1200);
-      await expect(firstRetryPromise).resolves.toBe(true);
-      await expect(secondRetryPromise).resolves.toBe(true);
+      await expect(gameService.processBotAction('lobby-1', 'Player1')).resolves.toBe(false);
+      expect(newRoundTransaction.getData().roundStatus).toBe(NEW_ROUND_STATUS);
+      expect(newRoundTransaction.getData().rounds.at(-1).currentTurn).toBe(3);
 
-      const data = transaction.getData();
-      expect(data.rounds.at(-1).players.Player1.wins).toBe(1);
-      expect(data.rounds.at(-1).currentTurn).toBe(2);
-      expect(data.currentPlayerIdx).toBe(0);
-      expect(data.roundStatus).toBe(GAME_STATUS);
+      const gameOverTransaction = useTransactionData(
+        createLobby({
+          currentPlayerIdx: 3,
+          players: {
+            ...players,
+            Player4: {
+              ...players.Player4,
+              isBot: true,
+            },
+          },
+          roundNumber: MAX_ROUNDS,
+          roundStatus: GAME_OVER_STATUS,
+          rounds: [
+            {
+              currentTurn: MAX_ROUNDS,
+              players: createRoundPlayers({
+                Player1: { played: playedOnLastTurn(card('A', HEART)), wins: 0 },
+                Player2: { played: playedOnLastTurn(card('K', HEART)), wins: 0 },
+                Player3: { played: playedOnLastTurn(card('Q', HEART)), wins: 0 },
+                Player4: { bids: 0, played: playedOnLastTurn(card('7', HEART)), wins: 0 },
+              }),
+              startPlayerIdx: 0,
+              trumpSuit: SPADE,
+            },
+          ],
+        })
+      );
+
+      await expect(gameService.processBotAction('lobby-1', 'Player1')).resolves.toBe(false);
+      expect(gameOverTransaction.getData().roundStatus).toBe(GAME_OVER_STATUS);
+      expect(gameOverTransaction.getData().rounds.at(-1).currentTurn).toBe(MAX_ROUNDS);
     });
 
     it('returns false for missing lobbies, human turns, and missing round-player data', async () => {
@@ -1007,6 +1023,8 @@ describe('gameService', () => {
               players: createRoundPlayers({
                 Player1: { played: [card('K', SPADE)] },
                 Player2: { played: [card('2', SPADE)] },
+                Player3: { played: [card('3', SPADE)] },
+                Player4: { played: [card('4', SPADE)] },
               }),
               startPlayerIdx: 0,
               trumpSuit: '',
@@ -1035,6 +1053,8 @@ describe('gameService', () => {
               players: createRoundPlayers({
                 Player1: { played: [card('A', SPADE)] },
                 Player2: { played: [card('SJ', JOKER)] },
+                Player3: { played: [card('K', HEART)] },
+                Player4: { played: [card('2', CLUB)] },
               }),
               startPlayerIdx: 0,
               trumpSuit: HEART,
@@ -1050,8 +1070,7 @@ describe('gameService', () => {
       expect(transaction.getData().rounds.at(-1).players.Player2.wins).toBe(1);
     });
 
-    it('finds the winning card even when the start player has no card recorded for the trick', async () => {
-      vi.useFakeTimers();
+    it('does not resolve a trick until every player has played that turn', async () => {
       const transaction = useTransactionData(
         createLobby({
           roundNumber: 3,
@@ -1071,15 +1090,94 @@ describe('gameService', () => {
         })
       );
 
-      const updatePromise = gameService.updateTurnWinner('lobby-1');
-      await vi.advanceTimersByTimeAsync(1200);
-      await updatePromise;
+      await gameService.updateTurnWinner('lobby-1');
 
       const data = transaction.getData();
-      expect(data.rounds.at(-1).players.Player3.wins).toBe(1);
-      expect(data.rounds.at(-1).startPlayerIdx).toBe(2);
-      expect(data.currentPlayerIdx).toBe(2);
+      expect(data.rounds.at(-1).players.Player3.wins).toBe(0);
+      expect(data.rounds.at(-1).startPlayerIdx).toBe(0);
+      expect(data.currentPlayerIdx).toBe(0);
+      expect(data.rounds.at(-1).currentTurn).toBe(1);
+      expect(data.roundStatus).toBe(GAME_STATUS);
+    });
+
+    it('does not resolve the same trick twice when turn-winner calls overlap', async () => {
+      vi.useFakeTimers();
+      const transaction = useTransactionData(
+        createLobby({
+          roundNumber: 3,
+          rounds: [
+            {
+              currentTurn: 1,
+              players: createRoundPlayers({
+                Player1: { played: [card('A', HEART)], wins: 0 },
+                Player2: { played: [card('K', HEART)], wins: 0 },
+                Player3: { played: [card('Q', HEART)], wins: 0 },
+                Player4: { played: [card('7', HEART)], wins: 0 },
+              }),
+              startPlayerIdx: 0,
+              trumpSuit: SPADE,
+            },
+          ],
+        })
+      );
+
+      const firstUpdatePromise = gameService.updateTurnWinner('lobby-1');
+      const secondUpdatePromise = gameService.updateTurnWinner('lobby-1');
+      await vi.advanceTimersByTimeAsync(1200);
+      await firstUpdatePromise;
+      await secondUpdatePromise;
+
+      const data = transaction.getData();
+      expect(data.rounds.at(-1).players.Player1.wins).toBe(1);
       expect(data.rounds.at(-1).currentTurn).toBe(2);
+      expect(data.roundStatus).toBe(GAME_STATUS);
+    });
+
+    it('does not finalize the game when the final trick is incomplete', async () => {
+      const transaction = useTransactionData(
+        createLobby({
+          players: {
+            Player1: { accumulated: 0, cards: [card('2', CLUB)], orderIdx: 0, score: 100 },
+            Player2: { accumulated: 0, cards: [card('3', CLUB)], orderIdx: 1, score: 90 },
+            Player3: { accumulated: 0, cards: [card('4', CLUB)], orderIdx: 2, score: 80 },
+            Player4: { accumulated: 0, cards: [card('5', CLUB)], orderIdx: 3, score: 70 },
+          },
+          roundNumber: MAX_ROUNDS,
+          rounds: [
+            {
+              currentTurn: MAX_ROUNDS,
+              players: createRoundPlayers({
+                Player1: { bids: 0, played: playedOnLastTurn(card('A', SPADE)), wins: 0 },
+                Player2: {
+                  bids: 0,
+                  played: playedOnTurn(MAX_ROUNDS - 1, card('K', SPADE)),
+                  wins: 0,
+                },
+                Player3: {
+                  bids: 0,
+                  played: playedOnTurn(MAX_ROUNDS - 1, card('Q', SPADE)),
+                  wins: 0,
+                },
+                Player4: {
+                  bids: 0,
+                  played: playedOnTurn(MAX_ROUNDS - 1, card('J', SPADE)),
+                  wins: 0,
+                },
+              }),
+              startPlayerIdx: 0,
+              trumpSuit: SPADE,
+            },
+          ],
+        })
+      );
+
+      await gameService.updateTurnWinner('lobby-1');
+
+      const data = transaction.getData();
+      expect(data.roundStatus).toBe(GAME_STATUS);
+      expect(data.winnerNames).toBeUndefined();
+      expect(data.rounds.at(-1).currentTurn).toBe(MAX_ROUNDS);
+      expect(data.rounds.at(-1).players.Player1.wins).toBe(0);
     });
 
     it('finalizes scores and winners when the last turn of the last round completes', async () => {
@@ -1208,6 +1306,8 @@ describe('gameService', () => {
               players: createRoundPlayers({
                 Player1: { bids: 1, played: [card('A', SPADE)], wins: 0 },
                 Player2: { bids: 1, played: [card('K', SPADE)], wins: 0 },
+                Player3: { bids: 1, played: [card('Q', SPADE)], wins: 0 },
+                Player4: { bids: 1, played: [card('J', SPADE)], wins: 0 },
               }),
               startPlayerIdx: 0,
               trumpSuit: SPADE,

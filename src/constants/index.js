@@ -19,6 +19,7 @@ export const BOT_ACTION_DELAY = 650;
 export const BOT_NAME_LIMIT = 7;
 export const BOT_NAME_PREFIX = 'Bot';
 export const BOT_PIN = '1234';
+export const TURN_RESOLUTION_DELAY = 1200;
 
 export const BIDDING = 'Bidding';
 export const GAME_STATUS = 'Game Status';
@@ -113,6 +114,11 @@ export const CARDS_ORDER = {
   BJ: 15,
 };
 
+export const LOCAL_STORAGE_KEYS = {
+  CLIENT_ID: 'precisionBid.clientId',
+  DISPLAY_NAME: 'precisionBid.displayName',
+};
+
 // Arrays
 export const CARD_VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 export const CARD_SUITS = [SPADE, HEART, DIAMOND, CLUB];
@@ -124,8 +130,3 @@ export const LOADING_MESSAGES = [
   'Determining game mode and rules',
   'Preparing trick play sequence',
 ];
-
-export const LOCAL_STORAGE_KEYS = {
-  CLIENT_ID: 'precisionBid.clientId',
-  DISPLAY_NAME: 'precisionBid.displayName',
-};
