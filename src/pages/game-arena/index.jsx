@@ -626,7 +626,7 @@ export const GameArenaPage = ({ lobbyId, gameData, playerName, onLeave }) => {
               <div className="relative z-20 mt-4 grid grid-cols-[repeat(auto-fit,minmax(8.25rem,1fr))] gap-2.5 sm:absolute sm:inset-0 sm:mt-0 sm:block">
                 {players.map((player, idx) => (
                   <GameSeat
-                    key={idx}
+                    key={player.name}
                     player={player}
                     totalSeats={players.length}
                     seatIndex={idx}
